@@ -1,3 +1,4 @@
+// ALL THESE CODE WERE CREATED BY GPT-5
 import React from "react";
 import DataEditor, {
   GridCellKind,
@@ -12,9 +13,12 @@ export default function SpreadsheetGrid() {
   const [activeCell, setActiveCell] = React.useState<{ col: number; row: number; id: string } | null>(null);
   const [cellValue, setCellValue] = React.useState("");
 
+  const totalCols = 26;
+  const totalRows = 300;
+
   const columns: GridColumn[] = [
     { id: "rowIndex", title: "", width: 50 },
-    ...Array.from({ length: 26 }, (_, i) => {
+    ...Array.from({ length: totalCols }, (_, i) => {
       const name = String.fromCharCode(65 + i);
       return { id: name, title: name, width: 80 };
     }),
@@ -68,11 +72,40 @@ export default function SpreadsheetGrid() {
     }
   };
 
+  // ✅ Export CSV
+  const handleExportCSV = () => {
+    const rows: string[][] = [];
+
+    for (let row = 0; row < totalRows; row++) {
+      const rowValues: string[] = [];
+      for (let col = 1; col <= totalCols; col++) {
+        const cellId = getCellId(col, row);
+        rowValues.push(values[cellId] ?? "");
+      }
+      rows.push(rowValues);
+    }
+
+    const csvContent = rows.map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "spreadsheet_data.csv");
+    link.click();
+
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div style={{ height: "80vh", width: "100%", position: "relative" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
+        <button onClick={handleExportCSV}>⬇️ Export CSV</button>
+      </div>
+
       <DataEditor
         columns={columns}
-        rows={300}
+        rows={totalRows}
         getCellContent={getCellContent}
         freezeColumns={1}
         freezeTrailingRows={1}
