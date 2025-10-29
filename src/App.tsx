@@ -3,8 +3,8 @@ import SpreadsheetGrid from "./SpreadsheetGrid";
 
 function App() {
   return (
-    <div style={{ padding: 20 }}>
-      <h1>My Spreadsheet</h1>
+    <div style={{ padding: 5 }}>
+      <h5>My Spreadsheet</h5>
       <SpreadsheetGrid />
     </div>
   );
