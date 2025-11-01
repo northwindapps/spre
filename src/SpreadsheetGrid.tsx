@@ -66,7 +66,7 @@ export default function SpreadsheetGrid() {
   const handleSave = () => {
     if (!activeCell) return;
 
-    const parts = cellValue.split(",").map((v) => v.trim()).filter(Boolean);
+    const parts = cellValue.split(":").map((v) => v.trim()).filter(Boolean);
 
     setValues((prev) => {
       const newValues = { ...prev };
@@ -161,7 +161,7 @@ export default function SpreadsheetGrid() {
             value={cellValue}
             onChange={(e) => setCellValue(e.target.value)}
             style={{ width: "100%", height: "80px", marginBottom: "1rem" }}
-            placeholder="Enter values separated by commas (e.g., dog,cat,monkey)"
+            placeholder="Enter values separated by colones (e.g., dog:cat:monkey)"
           />
           <div style={{ textAlign: "right" }}>
             <button onClick={() => setActiveCell(null)} style={{ marginRight: "0.5rem" }}>

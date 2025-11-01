@@ -50,7 +50,7 @@ export default function SpreadsheetGrid() {
     const handleSave = () => {
         if (!activeCell)
             return;
-        const parts = cellValue.split(",").map((v) => v.trim()).filter(Boolean);
+        const parts = cellValue.split(":").map((v) => v.trim()).filter(Boolean);
         setValues((prev) => {
             const newValues = Object.assign({}, prev);
             parts.forEach((part, i) => {
@@ -104,5 +104,5 @@ export default function SpreadsheetGrid() {
                     boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
                     zIndex: 10,
                     width: "300px",
-                }, children: [_jsxs("h3", { children: ["Edit Cell ", activeCell.id] }), _jsx("textarea", { value: cellValue, onChange: (e) => setCellValue(e.target.value), style: { width: "100%", height: "80px", marginBottom: "1rem" }, placeholder: "Enter values separated by commas (e.g., dog,cat,monkey)" }), _jsxs("div", { style: { textAlign: "right" }, children: [_jsx("button", { onClick: () => setActiveCell(null), style: { marginRight: "0.5rem" }, children: "Cancel" }), _jsx("button", { onClick: handleSave, children: "Save" })] })] }))] }));
+                }, children: [_jsxs("h3", { children: ["Edit Cell ", activeCell.id] }), _jsx("textarea", { value: cellValue, onChange: (e) => setCellValue(e.target.value), style: { width: "100%", height: "80px", marginBottom: "1rem" }, placeholder: "Enter values separated by colones (e.g., dog:cat:monkey)" }), _jsxs("div", { style: { textAlign: "right" }, children: [_jsx("button", { onClick: () => setActiveCell(null), style: { marginRight: "0.5rem" }, children: "Cancel" }), _jsx("button", { onClick: handleSave, children: "Save" })] })] }))] }));
 }
