@@ -1,4 +1,3 @@
-// ALL THESE CODE WERE CREATED BY GPT-5
 import React from "react";
 import DataEditor, {
   GridCellKind,
@@ -12,6 +11,7 @@ export default function SpreadsheetGrid() {
   const [values, setValues] = React.useState<Record<string, string>>({});
   const [activeCell, setActiveCell] = React.useState<{ col: number; row: number; id: string } | null>(null);
   const [cellValue, setCellValue] = React.useState("");
+  const [fillDirection, setFillDirection] = React.useState<"horizontal" | "vertical">("horizontal");
 
   const totalCols = 26;
   const totalRows = 300;
@@ -62,17 +62,37 @@ export default function SpreadsheetGrid() {
     [values]
   );
 
+  // ✅ Updated: Support horizontal/vertical direction filling
   const handleSave = () => {
-    if (activeCell) {
-      setValues((prev) => ({
-        ...prev,
-        [activeCell.id]: cellValue,
-      }));
-      setActiveCell(null);
-    }
+    if (!activeCell) return;
+
+    const parts = cellValue.split(",").map((v) => v.trim()).filter(Boolean);
+
+    setValues((prev) => {
+      const newValues = { ...prev };
+
+      parts.forEach((part, i) => {
+        if (fillDirection === "horizontal") {
+          const targetCol = activeCell.col + i;
+          if (targetCol < columns.length) {
+            const targetId = getCellId(targetCol, activeCell.row);
+            newValues[targetId] = part;
+          }
+        } else {
+          const targetRow = activeCell.row + i;
+          if (targetRow < totalRows) {
+            const targetId = getCellId(activeCell.col, targetRow);
+            newValues[targetId] = part;
+          }
+        }
+      });
+
+      return newValues;
+    });
+
+    setActiveCell(null);
   };
 
-  // ✅ Export CSV
   const handleExportCSV = () => {
     const rows: string[][] = [];
 
@@ -99,7 +119,14 @@ export default function SpreadsheetGrid() {
 
   return (
     <div style={{ height: "80vh", width: "100%", position: "relative" }}>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
+      <div style={{ display: "flex", justifyContent: "flex-start", gap:"5px", marginBottom: "8px" }}>
+        <button
+          onClick={() =>
+            setFillDirection((prev) => (prev === "horizontal" ? "vertical" : "horizontal"))
+          }
+        >
+          🔄 Direction: {fillDirection === "horizontal" ? "Horizontal →" : "Vertical ↓"}
+        </button>
         <button onClick={handleExportCSV}>⬇️ Export CSV</button>
       </div>
 
@@ -134,6 +161,7 @@ export default function SpreadsheetGrid() {
             value={cellValue}
             onChange={(e) => setCellValue(e.target.value)}
             style={{ width: "100%", height: "80px", marginBottom: "1rem" }}
+            placeholder="Enter values separated by commas (e.g., dog,cat,monkey)"
           />
           <div style={{ textAlign: "right" }}>
             <button onClick={() => setActiveCell(null)} style={{ marginRight: "0.5rem" }}>
