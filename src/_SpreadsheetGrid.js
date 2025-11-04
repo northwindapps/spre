@@ -46,6 +46,7 @@ export default function SpreadsheetGrid() {
         setActiveCell({ col, row, id: cellId });
         setCellValue((_a = values[cellId]) !== null && _a !== void 0 ? _a : "");
     }, [values]);
+    // ✅ Updated: Support horizontal/vertical direction filling
     const handleSave = () => {
         if (!activeCell)
             return;
@@ -92,50 +93,6 @@ export default function SpreadsheetGrid() {
         link.click();
         URL.revokeObjectURL(url);
     };
-    // 🎤 --- SPEECH RECOGNITION SETUP ---
-    React.useEffect(() => {
-        console.log("🟢 Initializing speech recognition...");
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            console.error("❌ Speech Recognition not supported in this browser.");
-            return;
-        }
-        const recognition = new SpeechRecognition();
-        recognition.lang = "en-US"; // or "ja-JP"
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.onstart = () => console.log("🎙️ Speech recognition started");
-        recognition.onend = () => {
-            console.log("🔁 Speech recognition stopped or ended, restarting...");
-            recognition.start(); // auto-restart
-        };
-        recognition.onerror = (e) => console.error("⚠️ Speech recognition error:", e);
-        recognition.onresult = (event) => {
-            let transcript = "";
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                transcript += event.results[i][0].transcript;
-            }
-            console.log("🗣️ Transcript:", transcript);
-            // ✅ Always update the textarea content in real time{
-            setCellValue(transcript);
-        };
-        const startRecognition = () => {
-            try {
-                recognition.start();
-                console.log("▶️ Recognition started manually");
-            }
-            catch (err) {
-                console.error("❌ Error starting recognition:", err);
-            }
-        };
-        window.addEventListener("load", startRecognition);
-        return () => {
-            console.log("🛑 Cleaning up speech recognition...");
-            window.removeEventListener("load", startRecognition);
-            recognition.stop();
-        };
-    }, [activeCell]);
-    // 🎤 --- END SPEECH RECOGNITION ---
     return (_jsxs("div", { style: { height: "80vh", width: "100%", position: "relative" }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }, children: [_jsxs("button", { onClick: () => setFillDirection((prev) => (prev === "horizontal" ? "vertical" : "horizontal")), children: ["\uD83D\uDD04 Direction: ", fillDirection === "horizontal" ? "Horizontal →" : "Vertical ↓"] }), _jsx("button", { onClick: handleExportCSV, children: "\u2B07\uFE0F Export CSV" })] }), _jsx(DataEditor, { columns: columns, rows: totalRows, getCellContent: getCellContent, freezeColumns: 1, freezeTrailingRows: 1, rowHeight: 28, headerHeight: 32, onCellActivated: handleCellActivated }), activeCell && (_jsxs("div", { style: {
                     position: "absolute",
                     top: "50%",
@@ -147,5 +104,5 @@ export default function SpreadsheetGrid() {
                     boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
                     zIndex: 10,
                     width: "300px",
-                }, children: [_jsxs("h3", { children: ["Edit Cell ", activeCell.id] }), _jsx("textarea", { value: cellValue, onChange: (e) => setCellValue(e.target.value), style: { width: "100%", height: "80px", marginBottom: "1rem" }, placeholder: "Speak or type here..." }), _jsxs("div", { style: { textAlign: "right" }, children: [_jsx("button", { onClick: () => setActiveCell(null), style: { marginRight: "0.5rem" }, children: "Cancel" }), _jsx("button", { onClick: handleSave, children: "Save" })] })] }))] }));
+                }, children: [_jsxs("h3", { children: ["Edit Cell ", activeCell.id] }), _jsx("textarea", { value: cellValue, onChange: (e) => setCellValue(e.target.value), style: { width: "100%", height: "80px", marginBottom: "1rem" }, placeholder: "Enter values separated by colones (e.g., dog:cat:monkey)" }), _jsxs("div", { style: { textAlign: "right" }, children: [_jsx("button", { onClick: () => setActiveCell(null), style: { marginRight: "0.5rem" }, children: "Cancel" }), _jsx("button", { onClick: handleSave, children: "Save" })] })] }))] }));
 }

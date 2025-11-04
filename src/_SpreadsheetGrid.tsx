@@ -62,6 +62,7 @@ export default function SpreadsheetGrid() {
     [values]
   );
 
+  // ✅ Updated: Support horizontal/vertical direction filling
   const handleSave = () => {
     if (!activeCell) return;
 
@@ -116,67 +117,9 @@ export default function SpreadsheetGrid() {
     URL.revokeObjectURL(url);
   };
 
-  // 🎤 --- SPEECH RECOGNITION SETUP ---
-  React.useEffect(() => {
-  console.log("🟢 Initializing speech recognition...");
-
-  const SpeechRecognition =
-    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-  if (!SpeechRecognition) {
-    console.error("❌ Speech Recognition not supported in this browser.");
-    return;
-  }
-
-  const recognition = new SpeechRecognition();
-  recognition.lang = "en-US"; // or "ja-JP"
-  recognition.continuous = true;
-  recognition.interimResults = true;
-
-  recognition.onstart = () => console.log("🎙️ Speech recognition started");
-  recognition.onend = () => {
-    console.log("🔁 Speech recognition stopped or ended, restarting...");
-    recognition.start(); // auto-restart
-  };
-  recognition.onerror = (e: any) => console.error("⚠️ Speech recognition error:", e);
-
-  recognition.onresult = (event: SpeechRecognitionEvent) => {
-  let transcript = "";
-
-  for (let i = event.resultIndex; i < event.results.length; i++) {
-    transcript += event.results[i][0].transcript;
-  }
-
-  console.log("🗣️ Transcript:", transcript);
-
-  // ✅ Always update the textarea content in real time{
-  setCellValue(transcript);
-};
-
-
-  const startRecognition = () => {
-    try {
-      recognition.start();
-      console.log("▶️ Recognition started manually");
-    } catch (err) {
-      console.error("❌ Error starting recognition:", err);
-    }
-  };
-
-  window.addEventListener("load", startRecognition);
-  return () => {
-    console.log("🛑 Cleaning up speech recognition...");
-    window.removeEventListener("load", startRecognition);
-    recognition.stop();
-  };
-}, [activeCell]);
-
-
-  // 🎤 --- END SPEECH RECOGNITION ---
-
   return (
     <div style={{ height: "80vh", width: "100%", position: "relative" }}>
-      <div style={{ display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }}>
+      <div style={{ display: "flex", justifyContent: "flex-start", gap:"5px", marginBottom: "8px" }}>
         <button
           onClick={() =>
             setFillDirection((prev) => (prev === "horizontal" ? "vertical" : "horizontal"))
@@ -218,7 +161,7 @@ export default function SpreadsheetGrid() {
             value={cellValue}
             onChange={(e) => setCellValue(e.target.value)}
             style={{ width: "100%", height: "80px", marginBottom: "1rem" }}
-            placeholder="Speak or type here..."
+            placeholder="Enter values separated by colones (e.g., dog:cat:monkey)"
           />
           <div style={{ textAlign: "right" }}>
             <button onClick={() => setActiveCell(null)} style={{ marginRight: "0.5rem" }}>

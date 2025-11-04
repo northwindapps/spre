@@ -7,5 +7,6 @@
     "module": "ESNext",
     "target": "ES6",
     "skipLibCheck": true
-  }
+  },
+  "include": ["src", "src/types"]
 }
