@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Finger Gesture Demo</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #111;
+      color: white;
+      font-family: Arial;
+    }
+    #gesture {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      font-size: 32px;
+      background: rgba(0,0,0,0.6);
+      padding: 10px 20px;
+      border-radius: 8px;
+      z-index: 10; 
+    }
+    canvas {
+      position: fixed;
+      top: 0; left: 0;
+      z-index: 1; 
+    }
+  </style>
+</head>
+
+<body>
+  <div id="gesture">Gesture: none</div>
+  <video id="video" autoplay playsinline style="display:none"></video>
+  <canvas id="output"></canvas>
+
+  <!-- MediaPipe Hands -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <!-- Fingerpose for gesture recognition -->
+  <script src="https://cdn.jsdelivr.net/npm/fingerpose/dist/fingerpose.min.js"></script>
+
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("output");
+    const ctx = canvas.getContext("2d");
+    const gestureText = document.getElementById("gesture");
+
+    // Resize canvas to window
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.onresize = resize;
+    resize();
+
+    // --- Gesture definitions ---
+    const GE = window.fp.Gestures;
+    const FingerPose = window.fp;
+
+
+    const PointingGesture = new FingerPose.GestureDescription('pointing');
+
+    // Index finger: extended
+    PointingGesture.addCurl(FingerPose.Finger.Index, FingerPose.FingerCurl.NoCurl, 1.0);
+
+    // Other fingers: curled
+    for (let finger of [FingerPose.Finger.Middle, FingerPose.Finger.Ring, FingerPose.Finger.Pinky]) {
+      PointingGesture.addCurl(finger, FingerPose.FingerCurl.FullCurl, 1.0);
+    }
+
+    // Thumb: half curled is okay
+    PointingGesture.addCurl(FingerPose.Finger.Thumb, FingerPose.FingerCurl.HalfCurl, 0.5);
+
+
+    const TightThumbsUp = new FingerPose.GestureDescription('thumbs_up');
+
+    // Thumb must be fully extended
+    TightThumbsUp.addCurl(FingerPose.Finger.Thumb, FingerPose.FingerCurl.NoCurl, 1.0);
+
+    // Index and Middle MUST be fully curled
+    TightThumbsUp.addCurl(FingerPose.Finger.Index, FingerPose.FingerCurl.FullCurl, 1.0);
+    TightThumbsUp.addCurl(FingerPose.Finger.Middle, FingerPose.FingerCurl.FullCurl, 1.0);
+
+    // Ring and Pinky MUST be fully curled
+    TightThumbsUp.addCurl(FingerPose.Finger.Ring, FingerPose.FingerCurl.FullCurl, 1.0);
+    TightThumbsUp.addCurl(FingerPose.Finger.Pinky, FingerPose.FingerCurl.FullCurl, 1.0);
+
+    const knownGestures = [
+      TightThumbsUp,
+      GE.VictoryGesture,
+      PointingGesture,
+    ];
+
+    const gestureEstimator = new FingerPose.GestureEstimator(knownGestures);
+
+    // --- MediaPipe setup ---
+    const hands = new Hands({
+      locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6,
+    });
+
+    hands.onResults(onResults);
+
+    const camera = new Camera(video, {
+      onFrame: async () => {
+        await hands.send({ image: video });
+      },
+      width: 640,
+      height: 480,
+    });
+    camera.start();
+
+    function onResults(results) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Mirror image
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(
+        results.image,
+        -canvas.width,
+        0,
+        canvas.width,
+        canvas.height
+      );
+      ctx.restore();
+
+      if (!results.multiHandLandmarks[0]) {
+        gestureText.textContent = "Gesture: none";
+        return;
+      }
+
+      // *** landmarks ARE defined here ***
+      const landmarks = results.multiHandLandmarks[0];
+
+      // --- FIX: Convert MediaPipe → Fingerpose format (2D + un-mirror) ---
+      const twoD = landmarks.map(p => ({
+        x: p.x,  // Flip back (because you mirrored canvas)
+        y: p.y
+      }));
+
+      // Estimate gesture
+      const est = gestureEstimator.estimate(twoD, 2.5);
+      console.log(est);
+      if (est.gestures.length > 0) {
+        const gesture = est.gestures.sort((a, b) => b.score - a.score)[0].name;
+        gestureText.textContent = "Gesture: " + gesture;
+      } else {
+        gestureText.textContent = "Gesture: none";
+      }
+
+      // Draw landmarks
+      for (const point of landmarks) {
+        ctx.beginPath();
+        ctx.arc(
+          point.x * canvas.width,
+          point.y * canvas.height,
+          6,
+          0,
+          2 * Math.PI
+        );
+        ctx.fillStyle = "cyan";
+        ctx.fill();
+      }
+    }
+
+  </script>
+</body>
+</html>

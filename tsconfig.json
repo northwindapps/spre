@@ -6,7 +6,8 @@
     "strict": true,
     "module": "ESNext",
     "target": "ES6",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["src", "src/types"]
 }
