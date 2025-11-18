@@ -6,8 +6,10 @@ import DataEditor, {
   type Item,
 } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
-
-export default function SpreadsheetGrid() {
+interface SpreadsheetGridProps {
+  fingerPos: { x: number; y: number } | null;
+}
+export default function SpreadsheetGrid({ fingerPos }: SpreadsheetGridProps) {
   const [values, setValues] = React.useState<Record<string, string>>({});
   const [activeCell, setActiveCell] = React.useState<{ col: number; row: number; id: string } | null>(null);
   const [cellValue, setCellValue] = React.useState("");
@@ -117,59 +119,40 @@ export default function SpreadsheetGrid() {
   };
 
   // 🎤 --- SPEECH RECOGNITION SETUP ---
-  React.useEffect(() => {
-  console.log("🟢 Initializing speech recognition...");
-
+  // 🎤 Speech recognition
+React.useEffect(() => {
   const SpeechRecognition =
     (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-  if (!SpeechRecognition) {
-    console.error("❌ Speech Recognition not supported in this browser.");
-    return;
-  }
+  if (!SpeechRecognition) return;
 
   const recognition = new SpeechRecognition();
-  recognition.lang = "en-US"; // or "ja-JP"
+  recognition.lang = "en-US";
   recognition.continuous = true;
   recognition.interimResults = true;
 
-  recognition.onstart = () => console.log("🎙️ Speech recognition started");
-  recognition.onend = () => {
-    console.log("🔁 Speech recognition stopped or ended, restarting...");
-    recognition.start(); // auto-restart
-  };
-  recognition.onerror = (e: any) => console.error("⚠️ Speech recognition error:", e);
-
   recognition.onresult = (event: SpeechRecognitionEvent) => {
-  let transcript = "";
-
-  for (let i = event.resultIndex; i < event.results.length; i++) {
-    transcript += event.results[i][0].transcript;
-  }
-
-  console.log("🗣️ Transcript:", transcript);
-
-  // ✅ Always update the textarea content in real time{
-  setCellValue(transcript);
-};
-
-
-  const startRecognition = () => {
-    try {
-      recognition.start();
-      console.log("▶️ Recognition started manually");
-    } catch (err) {
-      console.error("❌ Error starting recognition:", err);
+    let transcript = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
     }
+    setCellValue(transcript);
   };
 
-  window.addEventListener("load", startRecognition);
-  return () => {
-    console.log("🛑 Cleaning up speech recognition...");
-    window.removeEventListener("load", startRecognition);
-    recognition.stop();
-  };
-}, [activeCell]);
+  recognition.onend = () => recognition.start(); // auto-restart
+
+  recognition.start();
+
+  return () => recognition.stop();
+}, []);
+
+// 🖐 Finger tracking
+React.useEffect(() => {
+  if (!fingerPos) return;
+  const x = fingerPos.x ;
+  const y = fingerPos.y;
+  console.log("finger in canvas coords:", x, y);
+}, [fingerPos]);
 
 
   // 🎤 --- END SPEECH RECOGNITION ---

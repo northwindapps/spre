@@ -10,41 +10,35 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Hands } from "@mediapipe/hands";
 import { Camera } from "@mediapipe/camera_utils";
-import * as fp from "fingerpose";
 import { useEffect, useRef } from "react";
-export default function HandDetector() {
+export default function HandDetector({ onFingerMove }) {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     useEffect(() => {
+        if (!videoRef.current)
+            return;
         const hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
         });
         hands.setOptions({
             maxNumHands: 1,
-            modelComplexity: 0, // lower complexity = faster
+            modelComplexity: 0,
             minDetectionConfidence: 0.8,
             minTrackingConfidence: 0.5,
         });
+        let camera = null;
+        let stopped = false;
         hands.onResults((results) => {
-            if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
-                return; // no hands detected, skip
-            }
-            // Only track first detected hand
+            if (stopped)
+                return; // prevent sending after unmount
+            if (!results.multiHandLandmarks)
+                return;
             const landmarks = results.multiHandLandmarks[0];
-            // Index finger tip = landmark #8
+            if (!landmarks || landmarks.length < 9) {
+                return; // landmarks not fully available yet
+            }
             const indexTip = landmarks[8];
-            // Coordinates are normalized between 0–1
-            const x = indexTip.x;
-            const y = indexTip.y;
-            const z = indexTip.z;
-            console.log("Index Tip:", { x, y, z });
-            // --- Fingerpose example ---
-            const GE = new fp.GestureEstimator([
-                fp.Gestures.VictoryGesture,
-                fp.Gestures.ThumbsUpGesture,
-            ]);
-            const est = GE.estimate(landmarks, 7);
-            // console.log(est);
+            onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y });
             // --- Draw landmarks ---
             if (canvasRef.current) {
                 const ctx = canvasRef.current.getContext("2d");
@@ -60,18 +54,21 @@ export default function HandDetector() {
                 }
             }
         });
-        if (videoRef.current) {
-            const camera = new Camera(videoRef.current, {
-                onFrame: () => __awaiter(this, void 0, void 0, function* () {
-                    if (videoRef.current) {
-                        yield hands.send({ image: videoRef.current });
-                    }
-                }),
-                width: 640,
-                height: 480,
-            });
-            camera.start();
-        }
-    }, []);
+        camera = new Camera(videoRef.current, {
+            onFrame: () => __awaiter(this, void 0, void 0, function* () {
+                if (!videoRef.current || stopped)
+                    return;
+                yield hands.send({ image: videoRef.current });
+            }),
+            width: 640,
+            height: 480,
+        });
+        camera.start();
+        return () => {
+            stopped = true;
+            camera === null || camera === void 0 ? void 0 : camera.stop();
+            hands.close();
+        };
+    }, [onFingerMove]);
     return (_jsxs("div", { children: [_jsx("video", { ref: videoRef, style: { display: "none" } }), _jsx("canvas", { ref: canvasRef, width: 640, height: 480 })] }));
 }

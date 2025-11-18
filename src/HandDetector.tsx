@@ -2,53 +2,42 @@ import { Hands, Results } from "@mediapipe/hands";
 import { Camera } from "@mediapipe/camera_utils";
 import * as fp from "fingerpose";
 import { useEffect, useRef } from "react";
+interface HandDetectorProps {
+  onFingerMove?: (pos: { x: number; y: number }) => void;
+}
 
-export default function HandDetector() {
+export default function HandDetector({ onFingerMove }: HandDetectorProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    const hands = new Hands({
-      locateFile: (file: string) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
-    });
+  if (!videoRef.current) return;
 
-    hands.setOptions({
-      maxNumHands: 1,
-      modelComplexity: 0,            // lower complexity = faster
-      minDetectionConfidence: 0.8,
-      minTrackingConfidence: 0.5,
-    });
+  const hands = new Hands({
+    locateFile: (file) =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+  });
 
-    hands.onResults((results: Results) => {
-    if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
-      return; // no hands detected, skip
+  hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 0,
+    minDetectionConfidence: 0.8,
+    minTrackingConfidence: 0.5,
+  });
+
+  let camera: Camera | null = null;
+  let stopped = false;
+
+  hands.onResults((results: Results) => {
+    if (stopped) return; // prevent sending after unmount
+    if (!results.multiHandLandmarks) return;
+
+    const landmarks = results.multiHandLandmarks[0];
+    if (!landmarks || landmarks.length < 9) {
+      return; // landmarks not fully available yet
     }
-
-    
-
-    // Only track first detected hand
-  const landmarks = results.multiHandLandmarks[0];
-
-  // Index finger tip = landmark #8
-  const indexTip = landmarks[8];
-
-  // Coordinates are normalized between 0–1
-  const x = indexTip.x;
-  const y = indexTip.y;
-  const z = indexTip.z;
-
-  console.log("Index Tip:", { x, y, z });
-
-
-    // --- Fingerpose example ---
-    const GE = new fp.GestureEstimator([
-      fp.Gestures.VictoryGesture,
-      fp.Gestures.ThumbsUpGesture,
-    ]);
-
-    const est = GE.estimate(landmarks, 7);
-    // console.log(est);
+    const indexTip = landmarks[8];
+    onFingerMove?.({ x: indexTip.x, y: indexTip.y });
 
     // --- Draw landmarks ---
     if (canvasRef.current) {
@@ -67,20 +56,24 @@ export default function HandDetector() {
   });
 
 
-    if (videoRef.current) {
-      const camera = new Camera(videoRef.current, {
-        onFrame: async () => {
-          if (videoRef.current) {
-            await hands.send({ image: videoRef.current });
-          }
-        },
-        width: 640,
-        height: 480,
-      });
+  camera = new Camera(videoRef.current, {
+    onFrame: async () => {
+      if (!videoRef.current || stopped) return;
+      await hands.send({ image: videoRef.current });
+    },
+    width: 640,
+    height: 480,
+  });
 
-      camera.start();
-    }
-  }, []);
+  camera.start();
+
+  return () => {
+    stopped = true;
+    camera?.stop();
+    hands.close();
+  };
+}, [onFingerMove]);
+
 
   return (
     <div>

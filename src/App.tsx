@@ -1,14 +1,16 @@
-import React from "react";
+import React, { useState } from "react";
 import SpreadsheetGrid from "./SpreadsheetGrid";
 import HandDetector from "./HandDetector";
 
 function App() {
+  const [fingerPos, setFingerPos] = useState<{ x: number; y: number } | null>(null);
   return (
     <div style={{ padding: 5, position: "relative" }}>
       <h5>My Spreadsheet</h5>
 
       {/* Spreadsheet */}
-      <SpreadsheetGrid />
+      <SpreadsheetGrid fingerPos={fingerPos} />
+
 
       {/* Hand overlay */}
       <div style={{
@@ -20,7 +22,7 @@ function App() {
         pointerEvents: "none",      // 🔥 so it doesn’t block mouse
         zIndex: 9999,
       }}>
-        <HandDetector />
+      <HandDetector onFingerMove={({ x, y }) => setFingerPos({ x, y })} />
       </div>
     </div>
   );
@@ -28,14 +30,3 @@ function App() {
 
 
 export default App;
-
-
-// function App() {
-//   return (
-//     <div>
-//       <HandDetector />
-//     </div>
-//   );
-// }
-
-// export default App;
