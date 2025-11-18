@@ -7,9 +7,13 @@ import DataEditor, {
 } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 interface SpreadsheetGridProps {
-  fingerPos: { x: number; y: number } | null;
+  fingerPosRef: { x: number; y: number } | null;
 }
-export default function SpreadsheetGrid({ fingerPos }: SpreadsheetGridProps) {
+export default function SpreadsheetGrid({
+  fingerPosRef,
+}: {
+  fingerPosRef: React.RefObject<{ x: number; y: number } | null>;
+}) {
   const [values, setValues] = React.useState<Record<string, string>>({});
   const [activeCell, setActiveCell] = React.useState<{ col: number; row: number; id: string } | null>(null);
   const [cellValue, setCellValue] = React.useState("");
@@ -148,11 +152,18 @@ React.useEffect(() => {
 
 // 🖐 Finger tracking
 React.useEffect(() => {
-  if (!fingerPos) return;
-  const x = fingerPos.x ;
-  const y = fingerPos.y;
-  console.log("finger in canvas coords:", x, y);
-}, [fingerPos]);
+    const interval = setInterval(() => {
+      if (!fingerPosRef.current) return;
+
+      const { x, y } = fingerPosRef.current;
+      console.log("Finger coordinates inside grid:", x, y);
+
+      // You can now highlight or hover cells based on x,y
+      // without triggering a React state update
+    }, 16); // ~60fps
+
+    return () => clearInterval(interval);
+  }, [fingerPosRef]);
 
 
   // 🎤 --- END SPEECH RECOGNITION ---

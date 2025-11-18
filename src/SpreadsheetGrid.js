@@ -2,7 +2,7 @@ import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
 import React from "react";
 import DataEditor, { GridCellKind, } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
-export default function SpreadsheetGrid({ fingerPos }) {
+export default function SpreadsheetGrid({ fingerPosRef, }) {
     const [values, setValues] = React.useState({});
     const [activeCell, setActiveCell] = React.useState(null);
     const [cellValue, setCellValue] = React.useState("");
@@ -115,12 +115,16 @@ export default function SpreadsheetGrid({ fingerPos }) {
     }, []);
     // 🖐 Finger tracking
     React.useEffect(() => {
-        if (!fingerPos)
-            return;
-        const x = fingerPos.x;
-        const y = fingerPos.y;
-        console.log("finger in canvas coords:", x, y);
-    }, [fingerPos]);
+        const interval = setInterval(() => {
+            if (!fingerPosRef.current)
+                return;
+            const { x, y } = fingerPosRef.current;
+            console.log("Finger coordinates inside grid:", x, y);
+            // You can now highlight or hover cells based on x,y
+            // without triggering a React state update
+        }, 16); // ~60fps
+        return () => clearInterval(interval);
+    }, [fingerPosRef]);
     // 🎤 --- END SPEECH RECOGNITION ---
     return (_jsxs("div", { style: { height: "80vh", width: "100%", position: "relative" }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }, children: [_jsxs("button", { onClick: () => setFillDirection((prev) => (prev === "horizontal" ? "vertical" : "horizontal")), children: ["\uD83D\uDD04 Direction: ", fillDirection === "horizontal" ? "Horizontal →" : "Vertical ↓"] }), _jsx("button", { onClick: handleExportCSV, children: "\u2B07\uFE0F Export CSV" })] }), _jsx(DataEditor, { columns: columns, rows: totalRows, getCellContent: getCellContent, freezeColumns: 1, freezeTrailingRows: 1, rowHeight: 28, headerHeight: 32, onCellActivated: handleCellActivated }), activeCell && (_jsxs("div", { style: {
                     position: "absolute",
