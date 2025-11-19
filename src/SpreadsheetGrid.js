@@ -4,7 +4,8 @@ import DataEditor, { GridCellKind, } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 export default function SpreadsheetGrid({ fingerPosRef, }) {
     const [values, setValues] = React.useState({});
-    const [activeCell, setActiveCell] = React.useState(null);
+    const activeCellRef = React.useRef(null);
+    const [isEditing, setIsEditing] = React.useState(false);
     const [cellValue, setCellValue] = React.useState("");
     const [fillDirection, setFillDirection] = React.useState("horizontal");
     const totalCols = 26;
@@ -43,34 +44,34 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
         var _a;
         const [col, row] = cell;
         const cellId = getCellId(col, row);
-        setActiveCell({ col, row, id: cellId });
-        setCellValue((_a = values[cellId]) !== null && _a !== void 0 ? _a : "");
+        activeCellRef.current = { col, row, id: cellId }; // no rerender
+        setCellValue((_a = values[cellId]) !== null && _a !== void 0 ? _a : ""); // rerenders modal
+        setIsEditing(true); // show modal
     }, [values]);
     const handleSave = () => {
-        if (!activeCell)
+        if (!activeCellRef.current)
             return;
-        const parts = cellValue.split(":").map((v) => v.trim()).filter(Boolean);
-        setValues((prev) => {
+        const parts = cellValue.split(":").map(v => v.trim()).filter(Boolean);
+        setValues(prev => {
             const newValues = Object.assign({}, prev);
             parts.forEach((part, i) => {
+                const { col, row } = activeCellRef.current;
                 if (fillDirection === "horizontal") {
-                    const targetCol = activeCell.col + i;
+                    const targetCol = col + i;
                     if (targetCol < columns.length) {
-                        const targetId = getCellId(targetCol, activeCell.row);
-                        newValues[targetId] = part;
+                        newValues[getCellId(targetCol, row)] = part;
                     }
                 }
                 else {
-                    const targetRow = activeCell.row + i;
+                    const targetRow = row + i;
                     if (targetRow < totalRows) {
-                        const targetId = getCellId(activeCell.col, targetRow);
-                        newValues[targetId] = part;
+                        newValues[getCellId(col, targetRow)] = part;
                     }
                 }
             });
             return newValues;
         });
-        setActiveCell(null);
+        setIsEditing(false); // close modal
     };
     const handleExportCSV = () => {
         var _a;
@@ -126,7 +127,7 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
         return () => clearInterval(interval);
     }, [fingerPosRef]);
     // 🎤 --- END SPEECH RECOGNITION ---
-    return (_jsxs("div", { style: { height: "80vh", width: "100%", position: "relative" }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }, children: [_jsxs("button", { onClick: () => setFillDirection((prev) => (prev === "horizontal" ? "vertical" : "horizontal")), children: ["\uD83D\uDD04 Direction: ", fillDirection === "horizontal" ? "Horizontal →" : "Vertical ↓"] }), _jsx("button", { onClick: handleExportCSV, children: "\u2B07\uFE0F Export CSV" })] }), _jsx(DataEditor, { columns: columns, rows: totalRows, getCellContent: getCellContent, freezeColumns: 1, freezeTrailingRows: 1, rowHeight: 28, headerHeight: 32, onCellActivated: handleCellActivated }), activeCell && (_jsxs("div", { style: {
+    return (_jsxs("div", { style: { height: "80vh", width: "100%", position: "relative" }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }, children: [_jsxs("button", { onClick: () => setFillDirection((prev) => (prev === "horizontal" ? "vertical" : "horizontal")), children: ["\uD83D\uDD04 Direction: ", fillDirection === "horizontal" ? "Horizontal →" : "Vertical ↓"] }), _jsx("button", { onClick: handleExportCSV, children: "\u2B07\uFE0F Export CSV" })] }), _jsx(DataEditor, { columns: columns, rows: totalRows, getCellContent: getCellContent, freezeColumns: 1, freezeTrailingRows: 1, rowHeight: 28, headerHeight: 32, onCellActivated: handleCellActivated }), isEditing && activeCellRef.current && (_jsxs("div", { style: {
                     position: "absolute",
                     top: "50%",
                     left: "50%",
@@ -137,5 +138,5 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
                     boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
                     zIndex: 10,
                     width: "300px",
-                }, children: [_jsxs("h3", { children: ["Edit Cell ", activeCell.id] }), _jsx("textarea", { value: cellValue, onChange: (e) => setCellValue(e.target.value), style: { width: "100%", height: "80px", marginBottom: "1rem" }, placeholder: "Speak or type here..." }), _jsxs("div", { style: { textAlign: "right" }, children: [_jsx("button", { onClick: () => setActiveCell(null), style: { marginRight: "0.5rem" }, children: "Cancel" }), _jsx("button", { onClick: handleSave, children: "Save" })] })] }))] }));
+                }, children: [_jsxs("h3", { children: ["Edit Cell ", activeCellRef.current.id] }), _jsx("textarea", { value: cellValue, onChange: (e) => setCellValue(e.target.value), style: { width: "100%", height: "80px", marginBottom: "1rem" }, placeholder: "Speak or type here..." }), _jsxs("div", { style: { textAlign: "right" }, children: [_jsx("button", { onClick: () => setIsEditing(false), children: "Cancel" }), _jsx("button", { onClick: handleSave, children: "Save" })] })] }))] }));
 }

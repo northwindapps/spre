@@ -6,16 +6,16 @@ import DataEditor, {
   type Item,
 } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
-interface SpreadsheetGridProps {
-  fingerPosRef: { x: number; y: number } | null;
-}
+
 export default function SpreadsheetGrid({
   fingerPosRef,
 }: {
   fingerPosRef: React.RefObject<{ x: number; y: number } | null>;
 }) {
   const [values, setValues] = React.useState<Record<string, string>>({});
-  const [activeCell, setActiveCell] = React.useState<{ col: number; row: number; id: string } | null>(null);
+  const activeCellRef = React.useRef<{ col: number; row: number; id: string } | null>(null);
+  const [isEditing, setIsEditing] = React.useState(false);
+
   const [cellValue, setCellValue] = React.useState("");
   const [fillDirection, setFillDirection] = React.useState<"horizontal" | "vertical">("horizontal");
 
@@ -59,44 +59,47 @@ export default function SpreadsheetGrid({
   );
 
   const handleCellActivated = React.useCallback(
-    (cell: Item) => {
-      const [col, row] = cell;
-      const cellId = getCellId(col, row);
-      setActiveCell({ col, row, id: cellId });
-      setCellValue(values[cellId] ?? "");
-    },
-    [values]
-  );
+  (cell: Item) => {
+    const [col, row] = cell;
+    const cellId = getCellId(col, row);
+
+    activeCellRef.current = { col, row, id: cellId };  // no rerender
+    setCellValue(values[cellId] ?? "");                // rerenders modal
+    setIsEditing(true);                                // show modal
+  },
+  [values]
+);
+
 
   const handleSave = () => {
-    if (!activeCell) return;
+  if (!activeCellRef.current) return;
 
-    const parts = cellValue.split(":").map((v) => v.trim()).filter(Boolean);
+  const parts = cellValue.split(":").map(v => v.trim()).filter(Boolean);
 
-    setValues((prev) => {
-      const newValues = { ...prev };
+  setValues(prev => {
+    const newValues = { ...prev };
 
-      parts.forEach((part, i) => {
-        if (fillDirection === "horizontal") {
-          const targetCol = activeCell.col + i;
-          if (targetCol < columns.length) {
-            const targetId = getCellId(targetCol, activeCell.row);
-            newValues[targetId] = part;
-          }
-        } else {
-          const targetRow = activeCell.row + i;
-          if (targetRow < totalRows) {
-            const targetId = getCellId(activeCell.col, targetRow);
-            newValues[targetId] = part;
-          }
+    parts.forEach((part, i) => {
+      const { col, row } = activeCellRef.current!;
+
+      if (fillDirection === "horizontal") {
+        const targetCol = col + i;
+        if (targetCol < columns.length) {
+          newValues[getCellId(targetCol, row)] = part;
         }
-      });
-
-      return newValues;
+      } else {
+        const targetRow = row + i;
+        if (targetRow < totalRows) {
+          newValues[getCellId(col, targetRow)] = part;
+        }
+      }
     });
 
-    setActiveCell(null);
-  };
+    return newValues;
+  });
+
+  setIsEditing(false);   // close modal
+};
 
   const handleExportCSV = () => {
     const rows: string[][] = [];
@@ -192,7 +195,7 @@ React.useEffect(() => {
         onCellActivated={handleCellActivated}
       />
 
-      {activeCell && (
+      {isEditing && activeCellRef.current && (
         <div
           style={{
             position: "absolute",
@@ -207,7 +210,7 @@ React.useEffect(() => {
             width: "300px",
           }}
         >
-          <h3>Edit Cell {activeCell.id}</h3>
+          <h3>Edit Cell {activeCellRef.current.id}</h3>
           <textarea
             value={cellValue}
             onChange={(e) => setCellValue(e.target.value)}
@@ -215,9 +218,7 @@ React.useEffect(() => {
             placeholder="Speak or type here..."
           />
           <div style={{ textAlign: "right" }}>
-            <button onClick={() => setActiveCell(null)} style={{ marginRight: "0.5rem" }}>
-              Cancel
-            </button>
+            <button onClick={() => setIsEditing(false)}>Cancel</button>
             <button onClick={handleSave}>Save</button>
           </div>
         </div>
