@@ -4,6 +4,7 @@ import DataEditor, {
   type GridColumn,
   type GridCell,
   type Item,
+  DataEditorRef,
 } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 
@@ -14,6 +15,9 @@ export default function SpreadsheetGrid({
 }) {
   const [values, setValues] = React.useState<Record<string, string>>({});
   const activeCellRef = React.useRef<{ col: number; row: number; id: string } | null>(null);
+  const prevFingerPosRef = React.useRef<{ x: number; y: number } | null>(null);
+  const gridRef = React.useRef<DataEditorRef | null>(null);
+
   const [isEditing, setIsEditing] = React.useState(false);
 
   const [cellValue, setCellValue] = React.useState("");
@@ -59,47 +63,50 @@ export default function SpreadsheetGrid({
   );
 
   const handleCellActivated = React.useCallback(
-  (cell: Item) => {
-    const [col, row] = cell;
-    const cellId = getCellId(col, row);
+    (cell: Item) => {
+      const [col, row] = cell;
+      const cellId = getCellId(col, row);
 
-    activeCellRef.current = { col, row, id: cellId };  // no rerender
-    setCellValue(values[cellId] ?? "");                // rerenders modal
-    setIsEditing(true);                                // show modal
-  },
-  [values]
-);
+      activeCellRef.current = { col, row, id: cellId };  // no rerender
+      console.log('Cell activated:', activeCellRef.current); // <- log her
+      setCellValue(values[cellId] ?? "");                // rerenders modal
+      setIsEditing(true);                                // show modal
+
+      prevFingerPosRef.current = null;
+    },
+    [values]
+  );
 
 
   const handleSave = () => {
-  if (!activeCellRef.current) return;
+    if (!activeCellRef.current) return;
 
-  const parts = cellValue.split(":").map(v => v.trim()).filter(Boolean);
+    const parts = cellValue.split(":").map(v => v.trim()).filter(Boolean);
 
-  setValues(prev => {
-    const newValues = { ...prev };
+    setValues(prev => {
+      const newValues = { ...prev };
 
-    parts.forEach((part, i) => {
-      const { col, row } = activeCellRef.current!;
+      parts.forEach((part, i) => {
+        const { col, row } = activeCellRef.current!;
 
-      if (fillDirection === "horizontal") {
-        const targetCol = col + i;
-        if (targetCol < columns.length) {
-          newValues[getCellId(targetCol, row)] = part;
+        if (fillDirection === "horizontal") {
+          const targetCol = col + i;
+          if (targetCol < columns.length) {
+            newValues[getCellId(targetCol, row)] = part;
+          }
+        } else {
+          const targetRow = row + i;
+          if (targetRow < totalRows) {
+            newValues[getCellId(col, targetRow)] = part;
+          }
         }
-      } else {
-        const targetRow = row + i;
-        if (targetRow < totalRows) {
-          newValues[getCellId(col, targetRow)] = part;
-        }
-      }
+      });
+
+      return newValues;
     });
 
-    return newValues;
-  });
-
-  setIsEditing(false);   // close modal
-};
+    setIsEditing(false);   // close modal
+  };
 
   const handleExportCSV = () => {
     const rows: string[][] = [];
@@ -126,51 +133,122 @@ export default function SpreadsheetGrid({
   };
 
   // 🎤 --- SPEECH RECOGNITION SETUP ---
-  // 🎤 Speech recognition
-React.useEffect(() => {
-  const SpeechRecognition =
-    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  React.useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-  if (!SpeechRecognition) return;
+    if (!SpeechRecognition) return;
 
-  const recognition = new SpeechRecognition();
-  recognition.lang = "en-US";
-  recognition.continuous = true;
-  recognition.interimResults = true;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.continuous = true;
+    recognition.interimResults = true;
 
-  recognition.onresult = (event: SpeechRecognitionEvent) => {
-    let transcript = "";
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript;
-    }
-    setCellValue(transcript);
-  };
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setCellValue(transcript);
+    };
 
-  recognition.onend = () => recognition.start(); // auto-restart
+    recognition.onend = () => recognition.start(); // auto-restart
 
-  recognition.start();
+    recognition.start();
 
-  return () => recognition.stop();
-}, []);
+    return () => recognition.stop();
+  }, []);
 
-// 🖐 Finger tracking
-React.useEffect(() => {
+  // 🖐 Finger tracking
+  React.useEffect(() => {
     const interval = setInterval(() => {
-      if (!fingerPosRef.current) return;
+      const cur = fingerPosRef.current;
+      const active = activeCellRef.current;
+      if (!cur || !active) return;
 
-      const { x, y } = fingerPosRef.current;
-      console.log("Finger coordinates inside grid:", x, y);
+      const prev = prevFingerPosRef.current;
+      if (!prev) {
+        prevFingerPosRef.current = { ...cur };
+        return; // no movement yet
+      }
 
-      // You can now highlight or hover cells based on x,y
-      // without triggering a React state update
+      if (prev) {
+        const dx = cur.x - prev.x;
+        const dy = cur.y - prev.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const PIXEL_SCALE = 500; // adjust to your grid / screen size
+
+        const dxScaled = dx * PIXEL_SCALE;
+        const dyScaled = dy * PIXEL_SCALE;
+        const distanceScaled = Math.sqrt(dxScaled*dxScaled + dyScaled*dyScaled);
+
+        if(distanceScaled < 10) return;
+        if(!activeCellRef.current){
+          console.log('sorry yes');
+        }
+        if (activeCellRef.current && distanceScaled > 10) { // now threshold is meaningful
+          // MOVE RIGHT
+          if (dxScaled > 0.0) {
+            console.log('hit!!');
+            const old = activeCellRef.current;
+            const newCol = old.col + 1;
+
+            if (newCol >= 1 && newCol < columns.length) {
+              const newId = getCellId(newCol, old.row);
+
+              activeCellRef.current = {
+                col: newCol,
+                row: old.row,
+                id: newId,
+              };
+
+            setCellValue(values[newId] ?? "");
+
+            gridRef.current?.scrollTo?.(newCol, old.row, "both", 0, 0, { hAlign: "center", vAlign: "center" });
+          }
+        }
+
+
+          // MOVE LEFT
+          else {
+            console.log('hit!!');
+            const old = activeCellRef.current;
+            const newCol = old.col - 1;
+
+            if (newCol >= 1 && newCol < columns.length) {
+              const newId = getCellId(newCol, old.row);
+
+              activeCellRef.current = {
+                col: newCol,
+                row: old.row,
+                id: newId,
+              };
+
+            setCellValue(values[newId] ?? "");
+
+            gridRef.current?.scrollTo?.(newCol, old.row, "both", 0, 0, { hAlign: "center", vAlign: "center" });
+
+            }
+        }
+          
+        
+        }
+
+        prevFingerPosRef.current = { ...cur };
+
+        console.log("Moved:", distanceScaled, "px (dxScaled:", dxScaled, "dyScaled:", dyScaled, ")");
+      }
+
+
+      // update previous
+      prevFingerPosRef.current = { ...cur };
+
     }, 16); // ~60fps
 
     return () => clearInterval(interval);
   }, [fingerPosRef]);
 
-
   // 🎤 --- END SPEECH RECOGNITION ---
-
   return (
     <div style={{ height: "80vh", width: "100%", position: "relative" }}>
       <div style={{ display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }}>
@@ -185,6 +263,7 @@ React.useEffect(() => {
       </div>
 
       <DataEditor
+        ref={gridRef}
         columns={columns}
         rows={totalRows}
         getCellContent={getCellContent}

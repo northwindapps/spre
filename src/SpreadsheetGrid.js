@@ -5,6 +5,8 @@ import "@glideapps/glide-data-grid/dist/index.css";
 export default function SpreadsheetGrid({ fingerPosRef, }) {
     const [values, setValues] = React.useState({});
     const activeCellRef = React.useRef(null);
+    const prevFingerPosRef = React.useRef(null);
+    const gridRef = React.useRef(null);
     const [isEditing, setIsEditing] = React.useState(false);
     const [cellValue, setCellValue] = React.useState("");
     const [fillDirection, setFillDirection] = React.useState("horizontal");
@@ -45,8 +47,10 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
         const [col, row] = cell;
         const cellId = getCellId(col, row);
         activeCellRef.current = { col, row, id: cellId }; // no rerender
+        console.log('Cell activated:', activeCellRef.current); // <- log her
         setCellValue((_a = values[cellId]) !== null && _a !== void 0 ? _a : ""); // rerenders modal
         setIsEditing(true); // show modal
+        prevFingerPosRef.current = null;
     }, [values]);
     const handleSave = () => {
         if (!activeCellRef.current)
@@ -94,7 +98,6 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
         URL.revokeObjectURL(url);
     };
     // 🎤 --- SPEECH RECOGNITION SETUP ---
-    // 🎤 Speech recognition
     React.useEffect(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition)
@@ -117,17 +120,73 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
     // 🖐 Finger tracking
     React.useEffect(() => {
         const interval = setInterval(() => {
-            if (!fingerPosRef.current)
+            var _a, _b, _c, _d, _e, _f;
+            const cur = fingerPosRef.current;
+            const active = activeCellRef.current;
+            if (!cur || !active)
                 return;
-            const { x, y } = fingerPosRef.current;
-            console.log("Finger coordinates inside grid:", x, y);
-            // You can now highlight or hover cells based on x,y
-            // without triggering a React state update
+            const prev = prevFingerPosRef.current;
+            if (!prev) {
+                prevFingerPosRef.current = Object.assign({}, cur);
+                return; // no movement yet
+            }
+            if (prev) {
+                const dx = cur.x - prev.x;
+                const dy = cur.y - prev.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const PIXEL_SCALE = 500; // adjust to your grid / screen size
+                const dxScaled = dx * PIXEL_SCALE;
+                const dyScaled = dy * PIXEL_SCALE;
+                const distanceScaled = Math.sqrt(dxScaled * dxScaled + dyScaled * dyScaled);
+                if (distanceScaled < 10)
+                    return;
+                if (!activeCellRef.current) {
+                    console.log('sorry yes');
+                }
+                if (activeCellRef.current && distanceScaled > 10) { // now threshold is meaningful
+                    // MOVE RIGHT
+                    if (dxScaled > 0.0) {
+                        console.log('hit!!');
+                        const old = activeCellRef.current;
+                        const newCol = old.col + 1;
+                        if (newCol >= 1 && newCol < columns.length) {
+                            const newId = getCellId(newCol, old.row);
+                            activeCellRef.current = {
+                                col: newCol,
+                                row: old.row,
+                                id: newId,
+                            };
+                            setCellValue((_a = values[newId]) !== null && _a !== void 0 ? _a : "");
+                            (_c = (_b = gridRef.current) === null || _b === void 0 ? void 0 : _b.scrollTo) === null || _c === void 0 ? void 0 : _c.call(_b, newCol, old.row, "both", 0, 0, { hAlign: "center", vAlign: "center" });
+                        }
+                    }
+                    // MOVE LEFT
+                    else {
+                        console.log('hit!!');
+                        const old = activeCellRef.current;
+                        const newCol = old.col - 1;
+                        if (newCol >= 1 && newCol < columns.length) {
+                            const newId = getCellId(newCol, old.row);
+                            activeCellRef.current = {
+                                col: newCol,
+                                row: old.row,
+                                id: newId,
+                            };
+                            setCellValue((_d = values[newId]) !== null && _d !== void 0 ? _d : "");
+                            (_f = (_e = gridRef.current) === null || _e === void 0 ? void 0 : _e.scrollTo) === null || _f === void 0 ? void 0 : _f.call(_e, newCol, old.row, "both", 0, 0, { hAlign: "center", vAlign: "center" });
+                        }
+                    }
+                }
+                prevFingerPosRef.current = Object.assign({}, cur);
+                console.log("Moved:", distanceScaled, "px (dxScaled:", dxScaled, "dyScaled:", dyScaled, ")");
+            }
+            // update previous
+            prevFingerPosRef.current = Object.assign({}, cur);
         }, 16); // ~60fps
         return () => clearInterval(interval);
     }, [fingerPosRef]);
     // 🎤 --- END SPEECH RECOGNITION ---
-    return (_jsxs("div", { style: { height: "80vh", width: "100%", position: "relative" }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }, children: [_jsxs("button", { onClick: () => setFillDirection((prev) => (prev === "horizontal" ? "vertical" : "horizontal")), children: ["\uD83D\uDD04 Direction: ", fillDirection === "horizontal" ? "Horizontal →" : "Vertical ↓"] }), _jsx("button", { onClick: handleExportCSV, children: "\u2B07\uFE0F Export CSV" })] }), _jsx(DataEditor, { columns: columns, rows: totalRows, getCellContent: getCellContent, freezeColumns: 1, freezeTrailingRows: 1, rowHeight: 28, headerHeight: 32, onCellActivated: handleCellActivated }), isEditing && activeCellRef.current && (_jsxs("div", { style: {
+    return (_jsxs("div", { style: { height: "80vh", width: "100%", position: "relative" }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }, children: [_jsxs("button", { onClick: () => setFillDirection((prev) => (prev === "horizontal" ? "vertical" : "horizontal")), children: ["\uD83D\uDD04 Direction: ", fillDirection === "horizontal" ? "Horizontal →" : "Vertical ↓"] }), _jsx("button", { onClick: handleExportCSV, children: "\u2B07\uFE0F Export CSV" })] }), _jsx(DataEditor, { ref: gridRef, columns: columns, rows: totalRows, getCellContent: getCellContent, freezeColumns: 1, freezeTrailingRows: 1, rowHeight: 28, headerHeight: 32, onCellActivated: handleCellActivated }), isEditing && activeCellRef.current && (_jsxs("div", { style: {
                     position: "absolute",
                     top: "50%",
                     left: "50%",
