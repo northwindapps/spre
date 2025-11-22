@@ -4,14 +4,27 @@ import DataEditor, {
   type GridColumn,
   type GridCell,
   type Item,
+  DataEditorRef,
+  CompactSelection, 
+  type GridSelection,
 } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 
-export default function SpreadsheetGrid() {
+export default function SpreadsheetGrid({
+  fingerPosRef,
+}: {
+  fingerPosRef: React.RefObject<{ x: number; y: number; label: string } | null>;
+}) {
   const [values, setValues] = React.useState<Record<string, string>>({});
-  const [activeCell, setActiveCell] = React.useState<{ col: number; row: number; id: string } | null>(null);
+  const activeCellRef = React.useRef<{ col: number; row: number; id: string } | null>(null);
+  const prevFingerPosRef = React.useRef<{ x: number; y: number, label: string } | null>(null);
+  const gridRef = React.useRef<DataEditorRef | null>(null);
+
+  const [isEditing, setIsEditing] = React.useState(false);
+
   const [cellValue, setCellValue] = React.useState("");
   const [fillDirection, setFillDirection] = React.useState<"horizontal" | "vertical">("horizontal");
+  const [gridSelection, setGridSelection] = React.useState<GridSelection>();
 
   const totalCols = 26;
   const totalRows = 300;
@@ -56,32 +69,38 @@ export default function SpreadsheetGrid() {
     (cell: Item) => {
       const [col, row] = cell;
       const cellId = getCellId(col, row);
-      setActiveCell({ col, row, id: cellId });
-      setCellValue(values[cellId] ?? "");
+
+      activeCellRef.current = { col, row, id: cellId };  // no rerender
+      console.log('Cell activated:', activeCellRef.current); // <- log her
+      setCellValue(values[cellId] ?? "");                // rerenders modal
+      setIsEditing(true);                                // show modal
+
+      prevFingerPosRef.current = null;
     },
     [values]
   );
 
+
   const handleSave = () => {
-    if (!activeCell) return;
+    if (!activeCellRef.current) return;
 
-    const parts = cellValue.split(":").map((v) => v.trim()).filter(Boolean);
+    const parts = cellValue.split(":").map(v => v.trim()).filter(Boolean);
 
-    setValues((prev) => {
+    setValues(prev => {
       const newValues = { ...prev };
 
       parts.forEach((part, i) => {
+        const { col, row } = activeCellRef.current!;
+
         if (fillDirection === "horizontal") {
-          const targetCol = activeCell.col + i;
+          const targetCol = col + i;
           if (targetCol < columns.length) {
-            const targetId = getCellId(targetCol, activeCell.row);
-            newValues[targetId] = part;
+            newValues[getCellId(targetCol, row)] = part;
           }
         } else {
-          const targetRow = activeCell.row + i;
+          const targetRow = row + i;
           if (targetRow < totalRows) {
-            const targetId = getCellId(activeCell.col, targetRow);
-            newValues[targetId] = part;
+            newValues[getCellId(col, targetRow)] = part;
           }
         }
       });
@@ -89,7 +108,7 @@ export default function SpreadsheetGrid() {
       return newValues;
     });
 
-    setActiveCell(null);
+    setIsEditing(false);   // close modal
   };
 
   const handleExportCSV = () => {
@@ -118,62 +137,116 @@ export default function SpreadsheetGrid() {
 
   // 🎤 --- SPEECH RECOGNITION SETUP ---
   React.useEffect(() => {
-  console.log("🟢 Initializing speech recognition...");
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-  const SpeechRecognition =
-    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
 
-  if (!SpeechRecognition) {
-    console.error("❌ Speech Recognition not supported in this browser.");
-    return;
-  }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.continuous = true;
+    recognition.interimResults = true;
 
-  const recognition = new SpeechRecognition();
-  recognition.lang = "en-US"; // or "ja-JP"
-  recognition.continuous = true;
-  recognition.interimResults = true;
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setCellValue(transcript);
+    };
 
-  recognition.onstart = () => console.log("🎙️ Speech recognition started");
-  recognition.onend = () => {
-    console.log("🔁 Speech recognition stopped or ended, restarting...");
-    recognition.start(); // auto-restart
-  };
-  recognition.onerror = (e: any) => console.error("⚠️ Speech recognition error:", e);
+    recognition.onend = () => recognition.start(); // auto-restart
 
-  recognition.onresult = (event: SpeechRecognitionEvent) => {
-  let transcript = "";
+    recognition.start();
 
-  for (let i = event.resultIndex; i < event.results.length; i++) {
-    transcript += event.results[i][0].transcript;
-  }
+    return () => recognition.stop();
+  }, []);
 
-  console.log("🗣️ Transcript:", transcript);
+  React.useEffect(() => {
+    if (fingerPosRef.current?.label === "click") {
+        const fakeCell: Item = [1, 1];
+        handleCellActivated(fakeCell);
+      } // run after 0.2s
+  }, [fingerPosRef.current?.label]);
 
-  // ✅ Always update the textarea content in real time{
-  setCellValue(transcript);
-};
+  // 🖐 Finger tracking
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      const cur = fingerPosRef.current;
+      // Get the current position from the controlled state for reliability
+      const currentCell = gridSelection?.current?.cell;
+      if (!cur || !currentCell) {
+          // If we don't have a selection, try to fall back to the ref from the last activation
+          if (!cur || !activeCellRef.current) return;
+      }
 
+      const prev = prevFingerPosRef.current;
+      if (!prev) {
+        prevFingerPosRef.current = { ...cur };
+        return;
+      }
 
-  const startRecognition = () => {
-    try {
-      recognition.start();
-      console.log("▶️ Recognition started manually");
-    } catch (err) {
-      console.error("❌ Error starting recognition:", err);
-    }
-  };
+      const dx = cur.x - prev.x;
+      const dy = cur.y - prev.y;
+      const PIXEL_SCALE = 500;
+      const dxScaled = dx * PIXEL_SCALE;
+      const dyScaled = dy * PIXEL_SCALE;
+      const distanceScaled = Math.sqrt(dxScaled * dxScaled + dyScaled * dyScaled);
 
-  window.addEventListener("load", startRecognition);
-  return () => {
-    console.log("🛑 Cleaning up speech recognition...");
-    window.removeEventListener("load", startRecognition);
-    recognition.stop();
-  };
-}, [activeCell]);
+      // A dead zone to prevent jitter
+      if (distanceScaled < 10) return;
 
+      // Use the controlled state as the source of truth, with a fallback to the ref
+      const oldCol = currentCell ? currentCell[0] : activeCellRef.current!.col;
+      const oldRow = currentCell ? currentCell[1] : activeCellRef.current!.row;
+      
+      let newCol = oldCol;
+      let newRow = oldRow;
 
+      // ✨ 1. Decide if the move is mostly horizontal or vertical
+      if (Math.abs(dxScaled) > Math.abs(dyScaled)) {
+        // Horizontal move (your existing logic)
+        if (dxScaled > 10) newCol = oldCol + 1; // MOVE RIGHT
+        else if (dxScaled < -10) newCol = oldCol - 1; // MOVE LEFT
+      } else {
+        // ✨ 2. Vertical move (new logic)
+        if (dyScaled > 10) newRow = oldRow + 1; // MOVE DOWN
+        else if (dyScaled < -10) newRow = oldRow - 1; // MOVE UP
+      }
+
+      // ✨ 3. Check if a move was made and if it's within bounds
+      const moved = newCol !== oldCol || newRow !== oldRow;
+      const inBounds = newCol >= 1 && newCol < columns.length && newRow >= 0 && newRow < totalRows;
+
+      if (moved && inBounds) {
+        const newId = getCellId(newCol, newRow);
+
+        // update ref
+        activeCellRef.current = { col: newCol, row: newRow, id: newId };
+
+        // update modal
+        setCellValue(values[newId] ?? "");
+
+        setGridSelection({
+          current: {
+            cell: [newCol, newRow],
+            range: { x: newCol, y: newRow, width: 1, height: 1 },
+            rangeStack: [],
+          },
+          columns: CompactSelection.empty(),
+          rows: CompactSelection.empty(),
+        });
+        
+        // Optional: You can re-enable scrolling if needed
+        gridRef.current?.scrollTo(newCol, newRow);
+      }
+
+      prevFingerPosRef.current = { ...cur };
+    }, 50); // A slightly faster interval can feel more responsive
+
+    return () => clearInterval(interval);
+  }, [fingerPosRef, columns, values, getCellId, gridSelection, totalRows]); // ✨ Add totalRows
   // 🎤 --- END SPEECH RECOGNITION ---
-
   return (
     <div style={{ height: "80vh", width: "100%", position: "relative" }}>
       <div style={{ display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }}>
@@ -188,6 +261,7 @@ export default function SpreadsheetGrid() {
       </div>
 
       <DataEditor
+        ref={gridRef}
         columns={columns}
         rows={totalRows}
         getCellContent={getCellContent}
@@ -196,9 +270,22 @@ export default function SpreadsheetGrid() {
         rowHeight={28}
         headerHeight={32}
         onCellActivated={handleCellActivated}
+        onCellClicked={(cell) => {
+        const [col, row] = cell;
+        const cellId = getCellId(col, row);
+
+        // Update the ref whenever a cell is highlighted
+        activeCellRef.current = { col, row, id: cellId };
+
+        // Optional: update cellValue for modal or prefill
+        setCellValue(values[cellId] ?? "");
+        console.log("Cell highlighted:", cellId);
+      }}
+      gridSelection={gridSelection}
+        onGridSelectionChange={setGridSelection}
       />
 
-      {activeCell && (
+      {isEditing && activeCellRef.current && (
         <div
           style={{
             position: "absolute",
@@ -213,7 +300,7 @@ export default function SpreadsheetGrid() {
             width: "300px",
           }}
         >
-          <h3>Edit Cell {activeCell.id}</h3>
+          <h3>Edit Cell {activeCellRef.current.id}</h3>
           <textarea
             value={cellValue}
             onChange={(e) => setCellValue(e.target.value)}
@@ -221,9 +308,7 @@ export default function SpreadsheetGrid() {
             placeholder="Speak or type here..."
           />
           <div style={{ textAlign: "right" }}>
-            <button onClick={() => setActiveCell(null)} style={{ marginRight: "0.5rem" }}>
-              Cancel
-            </button>
+            <button onClick={() => setIsEditing(false)}>Cancel</button>
             <button onClick={handleSave}>Save</button>
           </div>
         </div>
@@ -231,3 +316,7 @@ export default function SpreadsheetGrid() {
     </div>
   );
 }
+function onCellClicked(arg0: { col: number; row: number; }, arg1: { kind: string; button: number; }) {
+  throw new Error("Function not implemented.");
+}
+
