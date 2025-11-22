@@ -119,7 +119,6 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
         return () => recognition.stop();
     }, []);
     // 🖐 Finger tracking
-    // 🖐 Finger tracking
     React.useEffect(() => {
         const interval = setInterval(() => {
             var _a, _b, _c;
