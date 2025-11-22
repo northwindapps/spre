@@ -3,6 +3,7 @@ import React from "react";
 import DataEditor, { GridCellKind, CompactSelection, } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 export default function SpreadsheetGrid({ fingerPosRef, }) {
+    var _a;
     const [values, setValues] = React.useState({});
     const activeCellRef = React.useRef(null);
     const prevFingerPosRef = React.useRef(null);
@@ -118,6 +119,13 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
         recognition.start();
         return () => recognition.stop();
     }, []);
+    React.useEffect(() => {
+        var _a;
+        if (((_a = fingerPosRef.current) === null || _a === void 0 ? void 0 : _a.label) === "click") {
+            const fakeCell = [1, 1];
+            handleCellActivated(fakeCell);
+        } // run after 0.2s
+    }, [(_a = fingerPosRef.current) === null || _a === void 0 ? void 0 : _a.label]);
     // 🖐 Finger tracking
     React.useEffect(() => {
         const interval = setInterval(() => {
@@ -211,4 +219,7 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
                     zIndex: 10,
                     width: "300px",
                 }, children: [_jsxs("h3", { children: ["Edit Cell ", activeCellRef.current.id] }), _jsx("textarea", { value: cellValue, onChange: (e) => setCellValue(e.target.value), style: { width: "100%", height: "80px", marginBottom: "1rem" }, placeholder: "Speak or type here..." }), _jsxs("div", { style: { textAlign: "right" }, children: [_jsx("button", { onClick: () => setIsEditing(false), children: "Cancel" }), _jsx("button", { onClick: handleSave, children: "Save" })] })] }))] }));
+}
+function onCellClicked(arg0, arg1) {
+    throw new Error("Function not implemented.");
 }

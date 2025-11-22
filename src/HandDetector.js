@@ -48,14 +48,8 @@ export default function HandDetector({ onFingerMove }) {
             if (!landmarks || landmarks.length < 9) {
                 return; // landmarks not fully available yet
             }
-            // const indexTip = landmarks[8];
-            // onFingerMove?.({ x: indexTip.x, y: indexTip.y });
             const lm = results.multiHandLandmarks[0];
             const wrist = lm[0];
-            if (lm.length > 9) {
-                const indexTip = lm[8];
-                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y });
-            }
             // Define the landmarks for each finger
             // [Base, Joint1, Joint2, Tip]
             // Note: We need the PIP joint (2nd from bottom) for the check
@@ -67,6 +61,7 @@ export default function HandDetector({ onFingerMove }) {
                 { name: "Pinky", tipsIdx: 20, compareIdx: 18, indices: [17, 18, 19, 20] },
             ];
             const statuses = [];
+            const statusMap = {};
             // Loop through each finger to check status and draw
             fingers.forEach((finger) => {
                 if (finger.name === "Thumb") {
@@ -74,6 +69,7 @@ export default function HandDetector({ onFingerMove }) {
                     const thumbIP = lm[3];
                     const indexMCP = lm[5];
                     const isOpen = dist(thumbTip, indexMCP) > dist(thumbIP, indexMCP);
+                    statusMap["Thumb"] = isOpen ? "OPEN" : "CURL";
                     statuses.push(`Thumb: ${isOpen ? "OPEN" : "CURL"}`);
                     ctx.fillStyle = isOpen ? "#00FF00" : "#FF0000";
                     for (const idx of finger.indices) {
@@ -88,6 +84,7 @@ export default function HandDetector({ onFingerMove }) {
                 const pivot = lm[finger.compareIdx]; // PIP or IP joint
                 // LOGIC: If Tip is further from Wrist than Pivot is, it is OPEN.
                 const isOpen = dist(wrist, tip) > dist(wrist, pivot);
+                statusMap[finger.name] = isOpen ? "OPEN" : "CURL";
                 statuses.push(`${finger.name}: ${isOpen ? "OPEN" : "CURL"}`);
                 // DRAWING: Color THIS finger's landmarks based on THIS finger's status
                 ctx.fillStyle = isOpen ? "#00FF00" : "#FF0000"; // Green = Open, Red = Curl
@@ -106,8 +103,16 @@ export default function HandDetector({ onFingerMove }) {
                 console.log(currentStatusStr);
                 lastLogRef.current = currentStatusStr;
             }
+            // share index inger movements
+            if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL") {
+                const indexTip = lm[8];
+                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "cursor" });
+            }
+            if (statusMap["Index"] == "CURL" && statusMap["Thumb"] == "OPEN" && statusMap["Middle"] == "CURL") {
+                const indexTip = lm[8];
+                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "click" });
+            }
         });
-        // --- Draw landmarks ---
         camera = new Camera(videoRef.current, {
             onFrame: () => __awaiter(this, void 0, void 0, function* () {
                 if (!videoRef.current || stopped)

@@ -3,7 +3,7 @@ import { Camera } from "@mediapipe/camera_utils";
 import * as fp from "fingerpose";
 import { useEffect, useRef } from "react";
 interface HandDetectorProps {
-  onFingerMove?: (pos: { x: number; y: number }) => void;
+  onFingerMove?: (pos: { x: number; y: number; label: string }) => void;
 }
 
 export default function HandDetector({ onFingerMove }: HandDetectorProps) {
@@ -41,7 +41,7 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     // ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-    
+
     if (stopped) return; // prevent sending after unmount
     if (!results.multiHandLandmarks) return;
 
@@ -51,11 +51,8 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
     }
   
     const lm = results.multiHandLandmarks[0];
-      const wrist = lm[0];
-      if (lm.length > 9){
-        const indexTip = lm[8];
-        onFingerMove?.({ x: indexTip.x, y: indexTip.y });
-      }
+    const wrist = lm[0];
+     
 
       // Define the landmarks for each finger
       // [Base, Joint1, Joint2, Tip]
@@ -69,6 +66,7 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
       ];
 
       const statuses: string[] = [];
+      const statusMap: Record<string, "OPEN" | "CURL"> = {};
 
       // Loop through each finger to check status and draw
       fingers.forEach((finger) => {
@@ -79,6 +77,8 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
 
           const isOpen =
             dist(thumbTip, indexMCP) > dist(thumbIP, indexMCP);
+          
+          statusMap["Thumb"] = isOpen ? "OPEN" : "CURL";
 
           statuses.push(`Thumb: ${isOpen ? "OPEN" : "CURL"}`);
           ctx.fillStyle = isOpen ? "#00FF00" : "#FF0000";
@@ -97,6 +97,8 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
 
         // LOGIC: If Tip is further from Wrist than Pivot is, it is OPEN.
         const isOpen = dist(wrist, tip) > dist(wrist, pivot);
+
+        statusMap[finger.name] = isOpen ? "OPEN" : "CURL";
         
         statuses.push(`${finger.name}: ${isOpen ? "OPEN" : "CURL"}`);
 
@@ -119,6 +121,15 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
       if (currentStatusStr !== lastLogRef.current) {
         console.log(currentStatusStr);
         lastLogRef.current = currentStatusStr;
+      }
+      // share index inger movements
+      if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL"){
+        const indexTip = lm[8];
+        onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "cursor" });
+      }
+      if (statusMap["Index"] == "CURL" && statusMap["Thumb"] == "OPEN" && statusMap["Middle"] == "CURL"){
+        const indexTip = lm[8];
+        onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "click" });
       }
     });
 

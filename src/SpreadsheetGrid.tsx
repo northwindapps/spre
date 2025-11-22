@@ -13,11 +13,11 @@ import "@glideapps/glide-data-grid/dist/index.css";
 export default function SpreadsheetGrid({
   fingerPosRef,
 }: {
-  fingerPosRef: React.RefObject<{ x: number; y: number } | null>;
+  fingerPosRef: React.RefObject<{ x: number; y: number; label: string } | null>;
 }) {
   const [values, setValues] = React.useState<Record<string, string>>({});
   const activeCellRef = React.useRef<{ col: number; row: number; id: string } | null>(null);
-  const prevFingerPosRef = React.useRef<{ x: number; y: number } | null>(null);
+  const prevFingerPosRef = React.useRef<{ x: number; y: number, label: string } | null>(null);
   const gridRef = React.useRef<DataEditorRef | null>(null);
 
   const [isEditing, setIsEditing] = React.useState(false);
@@ -161,6 +161,13 @@ export default function SpreadsheetGrid({
 
     return () => recognition.stop();
   }, []);
+
+  React.useEffect(() => {
+    if (fingerPosRef.current?.label === "click") {
+        const fakeCell: Item = [1, 1];
+        handleCellActivated(fakeCell);
+      } // run after 0.2s
+  }, [fingerPosRef.current?.label]);
 
   // 🖐 Finger tracking
   React.useEffect(() => {
@@ -309,3 +316,7 @@ export default function SpreadsheetGrid({
     </div>
   );
 }
+function onCellClicked(arg0: { col: number; row: number; }, arg1: { kind: string; button: number; }) {
+  throw new Error("Function not implemented.");
+}
+

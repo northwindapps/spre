@@ -4,7 +4,7 @@ import HandDetector from "./HandDetector";
 
 function App() {
   // Use a ref instead of state
-  const fingerPosRef = useRef<{ x: number; y: number } | null>(null);
+  const fingerPosRef = useRef<{ x: number; y: number; label: string } | null>(null);
 
   return (
     <div style={{ padding: 5, position: "relative" }}>
@@ -26,9 +26,9 @@ function App() {
         }}
       >
         <HandDetector
-          onFingerMove={({ x, y }) => {
+          onFingerMove={({ x, y, label }) => {
             // Update ref directly, no re-render
-            fingerPosRef.current = { x, y };
+            fingerPosRef.current = { x, y, label };
           }}
         />
       </div>
