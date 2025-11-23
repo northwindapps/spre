@@ -34,6 +34,7 @@ export default function HandDetector({ onFingerMove }) {
             return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
         };
         hands.onResults((results) => {
+            const ts = Date.now();
             const canvas = canvasRef.current;
             const ctx = canvas === null || canvas === void 0 ? void 0 : canvas.getContext("2d");
             if (!canvas || !ctx)
@@ -106,11 +107,11 @@ export default function HandDetector({ onFingerMove }) {
             // share index inger movements
             if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL") {
                 const indexTip = lm[0];
-                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "cursor" });
+                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "cursor", ts: ts });
             }
             if (statusMap["Index"] == "CURL" && statusMap["Thumb"] == "OPEN" && statusMap["Middle"] == "CURL") {
                 const indexTip = lm[0];
-                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "click" });
+                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "click", ts: ts });
             }
         });
         camera = new Camera(videoRef.current, {

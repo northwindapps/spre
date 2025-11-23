@@ -6,6 +6,7 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
     const [values, setValues] = React.useState({});
     const activeCellRef = React.useRef(null);
     const prevFingerPosRef = React.useRef(null);
+    const prevVelocityRef = React.useRef(null);
     const gridRef = React.useRef(null);
     const [isEditing, setIsEditing] = React.useState(false);
     const [cellValue, setCellValue] = React.useState("");
@@ -130,51 +131,70 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
     }, [fingerPosRef, handleCellActivated]);
     // 🖐 Finger tracking
     React.useEffect(() => {
-        var _a;
-        if (((_a = fingerPosRef.current) === null || _a === void 0 ? void 0 : _a.label) !== "cursor")
-            return;
         const interval = setInterval(() => {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
+            if (((_a = fingerPosRef.current) === null || _a === void 0 ? void 0 : _a.label) !== "cursor")
+                return;
             const cur = fingerPosRef.current;
             // Get the current position from the controlled state for reliability
-            const currentCell = (_a = gridSelection === null || gridSelection === void 0 ? void 0 : gridSelection.current) === null || _a === void 0 ? void 0 : _a.cell;
+            const currentCell = (_b = gridSelection === null || gridSelection === void 0 ? void 0 : gridSelection.current) === null || _b === void 0 ? void 0 : _b.cell;
             if (!cur || !currentCell) {
                 // If we don't have a selection, try to fall back to the ref from the last activation
                 if (!cur || !activeCellRef.current)
                     return;
             }
+            // Get previous samples
             const prev = prevFingerPosRef.current;
+            const prevVel = prevVelocityRef.current;
+            // First frame
             if (!prev) {
+                prevFingerPosRef.current = Object.assign({}, cur);
+                prevVelocityRef.current = { vx: 0, vy: 0, ts: cur.ts };
+                return;
+            }
+            const dt = (cur.ts - prev.ts) / 1000; // convert ms → seconds
+            if (dt <= 0)
+                return;
+            // --- Velocity ---
+            const vx = (cur.x - prev.x) / dt;
+            const vy = (cur.y - prev.y) / dt;
+            // --- First velocity frame ---
+            if (!prevVel) {
+                prevVelocityRef.current = { vx, vy, ts: cur.ts };
                 prevFingerPosRef.current = Object.assign({}, cur);
                 return;
             }
-            const dx = cur.x - prev.x;
-            const dy = cur.y - prev.y;
-            const PIXEL_SCALE = 500;
-            const dxScaled = dx * PIXEL_SCALE;
-            const dyScaled = dy * PIXEL_SCALE;
-            const distanceScaled = Math.sqrt(dxScaled * dxScaled + dyScaled * dyScaled);
-            // A dead zone to prevent jitter
-            if (distanceScaled < 10)
+            // --- Acceleration ---
+            const ax = (vx - prevVel.vx) / dt;
+            const ay = (vy - prevVel.vy) / dt;
+            // scale to pixel movement
+            const SCALE = 200; // adjust this to your taste
+            const moveX = ax * SCALE;
+            const moveY = ay * SCALE;
+            // threshold to avoid jitter
+            if (Math.abs(moveX) + Math.abs(moveY) < 1) {
+                prevFingerPosRef.current = Object.assign({}, cur);
+                prevVelocityRef.current = { vx, vy, ts: cur.ts };
                 return;
+            }
             // Use the controlled state as the source of truth, with a fallback to the ref
             const oldCol = currentCell ? currentCell[0] : activeCellRef.current.col;
             const oldRow = currentCell ? currentCell[1] : activeCellRef.current.row;
             let newCol = oldCol;
             let newRow = oldRow;
             // ✨ 1. Decide if the move is mostly horizontal or vertical
-            if (Math.abs(dxScaled) > Math.abs(dyScaled)) {
+            if (Math.abs(moveX) > Math.abs(moveY)) {
                 // Horizontal move (your existing logic)
-                if (dxScaled > 10)
+                if (moveX > 100)
                     newCol = oldCol + 1; // MOVE RIGHT
-                else if (dxScaled < -10)
+                else if (moveX < -100)
                     newCol = oldCol - 1; // MOVE LEFT
             }
             else {
                 // ✨ 2. Vertical move (new logic)
-                if (dyScaled > 10)
+                if (moveY > 100)
                     newRow = oldRow + 1; // MOVE DOWN
-                else if (dyScaled < -10)
+                else if (moveY < -100)
                     newRow = oldRow - 1; // MOVE UP
             }
             // ✨ 3. Check if a move was made and if it's within bounds
@@ -185,7 +205,7 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
                 // update ref
                 activeCellRef.current = { col: newCol, row: newRow, id: newId };
                 // update modal
-                setCellValue((_b = values[newId]) !== null && _b !== void 0 ? _b : "");
+                setCellValue((_c = values[newId]) !== null && _c !== void 0 ? _c : "");
                 setGridSelection({
                     current: {
                         cell: [newCol, newRow],
@@ -196,12 +216,14 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
                     rows: CompactSelection.empty(),
                 });
                 // Optional: You can re-enable scrolling if needed
-                (_c = gridRef.current) === null || _c === void 0 ? void 0 : _c.scrollTo(newCol, newRow);
+                (_d = gridRef.current) === null || _d === void 0 ? void 0 : _d.scrollTo(newCol, newRow);
             }
+            // update history
             prevFingerPosRef.current = Object.assign({}, cur);
+            prevVelocityRef.current = { vx, vy, ts: cur.ts };
         }, 50); // A slightly faster interval can feel more responsive
         return () => clearInterval(interval);
-    }, [fingerPosRef, columns, values, getCellId, gridSelection, totalRows]); // ✨ Add totalRows
+    }, []); // ✨ Add totalRows
     // 🎤 --- END SPEECH RECOGNITION ---
     return (_jsxs("div", { style: { height: "80vh", width: "100%", position: "relative" }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }, children: [_jsxs("button", { onClick: () => setFillDirection((prev) => (prev === "horizontal" ? "vertical" : "horizontal")), children: ["\uD83D\uDD04 Direction: ", fillDirection === "horizontal" ? "Horizontal →" : "Vertical ↓"] }), _jsx("button", { onClick: handleExportCSV, children: "\u2B07\uFE0F Export CSV" })] }), _jsx(DataEditor, { ref: gridRef, columns: columns, rows: totalRows, getCellContent: getCellContent, freezeColumns: 1, freezeTrailingRows: 1, rowHeight: 28, headerHeight: 32, onCellActivated: handleCellActivated, onCellClicked: (cell) => {
                     var _a;

@@ -3,7 +3,7 @@ import { Camera } from "@mediapipe/camera_utils";
 import * as fp from "fingerpose";
 import { useEffect, useRef } from "react";
 interface HandDetectorProps {
-  onFingerMove?: (pos: { x: number; y: number; label: string }) => void;
+  onFingerMove?: (pos: { x: number; y: number; label: string; ts: number }) => void;
 }
 
 export default function HandDetector({ onFingerMove }: HandDetectorProps) {
@@ -35,6 +35,7 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
   };
 
   hands.onResults((results: Results) => {
+    const ts = Date.now();
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
@@ -125,11 +126,12 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
       // share index inger movements
       if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL"){
         const indexTip = lm[0];
-        onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "cursor" });
+        
+        onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "cursor", ts:ts });
       }
       if (statusMap["Index"] == "CURL" && statusMap["Thumb"] == "OPEN" && statusMap["Middle"] == "CURL"){
         const indexTip = lm[0];
-        onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "click" });
+        onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "click", ts:ts  });
       }
     });
 
