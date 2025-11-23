@@ -163,17 +163,34 @@ export default function SpreadsheetGrid({
     return () => recognition.stop();
   }, []);
 
-
   React.useEffect(() => {
   const interval = setInterval(() => {
-    if (fingerPosRef.current?.label === "click") {
-      handleCellActivated([1,1]);
-      fingerPosRef.current.label = ""; // reset after handling
+    const pos = fingerPosRef.current;
+    if (!pos || pos.label !== "click") return;
+
+    // 🔍 get current cell from selection OR ref
+    const active = gridSelection?.current?.cell ?? (
+      activeCellRef.current
+        ? [activeCellRef.current.col, activeCellRef.current.row] as [number, number]
+        : null
+    );
+
+    if (!active) {
+      // nothing selected → do nothing
+      pos.label = ""; // still clear click
+      return;
     }
+
+    // ✨ safe: activate the existing cell
+    handleCellActivated(active);
+
+    // Reset click state
+    pos.label = "";
   }, 100);
 
   return () => clearInterval(interval);
-}, [fingerPosRef, handleCellActivated]);
+}, [gridSelection]);
+
 
   // 🖐 Finger tracking
   React.useEffect(() => {
@@ -181,11 +198,9 @@ export default function SpreadsheetGrid({
       if (fingerPosRef.current?.label !== "cursor") return;
       const cur = fingerPosRef.current;
       // Get the current position from the controlled state for reliability
-      const currentCell = gridSelection?.current?.cell;
-      if (!cur || !currentCell) {
-          // If we don't have a selection, try to fall back to the ref from the last activation
-          if (!cur || !activeCellRef.current) return;
-      }
+      const currentCol = activeCellRef.current?.col;
+      const currentRow = activeCellRef.current?.row;
+      if (currentCol == null || currentRow == null) return;
 
       // Get previous samples
     const prev = prevFingerPosRef.current;
@@ -201,9 +216,14 @@ export default function SpreadsheetGrid({
     const dt = (cur.ts - prev.ts) / 1000; // convert ms → seconds
     if (dt <= 0) return;
 
-    // --- Velocity ---
-    const vx = (cur.x - prev.x) / dt;
-    const vy = (cur.y - prev.y) / dt;
+    const ALPHA = 0.2; // smoothness (smaller = smoother)
+
+    const rawVx = (cur.x - prev.x) / dt;
+    const rawVy = (cur.y - prev.y) / dt;
+
+    const vx = prevVel ? prevVel.vx * (1 - ALPHA) + rawVx * ALPHA : rawVx;
+    const vy = prevVel ? prevVel.vy * (1 - ALPHA) + rawVy * ALPHA : rawVy;
+
 
     // --- First velocity frame ---
     if (!prevVel) {
@@ -213,13 +233,13 @@ export default function SpreadsheetGrid({
     }
 
     // --- Acceleration ---
-    const ax = (vx - prevVel.vx) / dt;
-    const ay = (vy - prevVel.vy) / dt;
+    // const ax = (vx - prevVel.vx) / dt;
+    // const ay = (vy - prevVel.vy) / dt;
 
     // scale to pixel movement
     const SCALE = 200;  // adjust this to your taste
-    const moveX = ax * SCALE;
-    const moveY = ay * SCALE;
+    const moveX = vx * SCALE;
+    const moveY = vy * SCALE;
 
     // threshold to avoid jitter
     if (Math.abs(moveX) + Math.abs(moveY) < 1) {
@@ -230,21 +250,20 @@ export default function SpreadsheetGrid({
 
 
       // Use the controlled state as the source of truth, with a fallback to the ref
-      const oldCol = currentCell ? currentCell[0] : activeCellRef.current!.col;
-      const oldRow = currentCell ? currentCell[1] : activeCellRef.current!.row;
-      
+      let oldCol = currentCol;
+      let oldRow = currentRow;
       let newCol = oldCol;
       let newRow = oldRow;
 
       // ✨ 1. Decide if the move is mostly horizontal or vertical
       if (Math.abs(moveX) > Math.abs(moveY)) {
         // Horizontal move (your existing logic)
-        if (moveX > 100) newCol = oldCol + 1; // MOVE RIGHT
-        else if (moveX < -100) newCol = oldCol - 1; // MOVE LEFT
+        if (moveX > 15) newCol = oldCol + 1; // MOVE RIGHT
+        else if (moveX < -15) newCol = oldCol - 1; // MOVE LEFT
       } else {
         // ✨ 2. Vertical move (new logic)
-        if (moveY > 100) newRow = oldRow + 1; // MOVE DOWN
-        else if (moveY < -100) newRow = oldRow - 1; // MOVE UP
+        if (moveY > 15) newRow = oldRow + 1; // MOVE DOWN
+        else if (moveY < -15) newRow = oldRow - 1; // MOVE UP
       }
 
       // ✨ 3. Check if a move was made and if it's within bounds
@@ -278,7 +297,7 @@ export default function SpreadsheetGrid({
       // update history
       prevFingerPosRef.current = { ...cur };
       prevVelocityRef.current = { vx, vy, ts: cur.ts };
-    }, 50); // A slightly faster interval can feel more responsive
+    }, 150); //50 A slightly faster interval can feel more responsive
 
     return () => clearInterval(interval);
   }, []);
