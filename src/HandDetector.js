@@ -105,11 +105,11 @@ export default function HandDetector({ onFingerMove }) {
             }
             // share index inger movements
             if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL") {
-                const indexTip = lm[8];
+                const indexTip = lm[0];
                 onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "cursor" });
             }
             if (statusMap["Index"] == "CURL" && statusMap["Thumb"] == "OPEN" && statusMap["Middle"] == "CURL") {
-                const indexTip = lm[8];
+                const indexTip = lm[0];
                 onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "click" });
             }
         });
@@ -129,5 +129,9 @@ export default function HandDetector({ onFingerMove }) {
             hands.close();
         };
     }, [onFingerMove]);
-    return (_jsxs("div", { children: [_jsx("video", { ref: videoRef, style: { display: "none" } }), _jsx("canvas", { ref: canvasRef, width: 640, height: 480 })] }));
+    return (_jsxs("div", { children: [_jsx("video", { ref: videoRef, style: { display: "none" } }), _jsx("canvas", { ref: canvasRef, style: {
+                    width: "100%", // stretches to parent width
+                    height: "100%", // stretches to parent height
+                    objectFit: "cover", // optional, preserves aspect
+                } })] }));
 }

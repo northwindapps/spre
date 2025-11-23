@@ -124,11 +124,11 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
       }
       // share index inger movements
       if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL"){
-        const indexTip = lm[8];
+        const indexTip = lm[0];
         onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "cursor" });
       }
       if (statusMap["Index"] == "CURL" && statusMap["Thumb"] == "OPEN" && statusMap["Middle"] == "CURL"){
-        const indexTip = lm[8];
+        const indexTip = lm[0];
         onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "click" });
       }
     });
@@ -155,7 +155,15 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
   return (
     <div>
       <video ref={videoRef} style={{ display: "none" }} />
-      <canvas ref={canvasRef} width={640} height={480} />
+      {/* <canvas ref={canvasRef} width={640} height={480} /> */}
+      <canvas
+        ref={canvasRef}
+        style={{
+          width: "100%",    // stretches to parent width
+          height: "100%",   // stretches to parent height
+          objectFit: "cover", // optional, preserves aspect
+        }}
+      />
     </div>
   );
 }

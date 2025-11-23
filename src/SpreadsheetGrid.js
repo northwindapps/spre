@@ -3,7 +3,6 @@ import React from "react";
 import DataEditor, { GridCellKind, CompactSelection, } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 export default function SpreadsheetGrid({ fingerPosRef, }) {
-    var _a;
     const [values, setValues] = React.useState({});
     const activeCellRef = React.useRef(null);
     const prevFingerPosRef = React.useRef(null);
@@ -120,14 +119,20 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
         return () => recognition.stop();
     }, []);
     React.useEffect(() => {
-        var _a;
-        if (((_a = fingerPosRef.current) === null || _a === void 0 ? void 0 : _a.label) === "click") {
-            const fakeCell = [1, 1];
-            handleCellActivated(fakeCell);
-        } // run after 0.2s
-    }, [(_a = fingerPosRef.current) === null || _a === void 0 ? void 0 : _a.label]);
+        const interval = setInterval(() => {
+            var _a;
+            if (((_a = fingerPosRef.current) === null || _a === void 0 ? void 0 : _a.label) === "click") {
+                handleCellActivated([1, 1]);
+                fingerPosRef.current.label = ""; // reset after handling
+            }
+        }, 100);
+        return () => clearInterval(interval);
+    }, [fingerPosRef, handleCellActivated]);
     // 🖐 Finger tracking
     React.useEffect(() => {
+        var _a;
+        if (((_a = fingerPosRef.current) === null || _a === void 0 ? void 0 : _a.label) !== "cursor")
+            return;
         const interval = setInterval(() => {
             var _a, _b, _c;
             const cur = fingerPosRef.current;

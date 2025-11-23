@@ -162,15 +162,21 @@ export default function SpreadsheetGrid({
     return () => recognition.stop();
   }, []);
 
+
   React.useEffect(() => {
+  const interval = setInterval(() => {
     if (fingerPosRef.current?.label === "click") {
-        const fakeCell: Item = [1, 1];
-        handleCellActivated(fakeCell);
-      } // run after 0.2s
-  }, [fingerPosRef.current?.label]);
+      handleCellActivated([1,1]);
+      fingerPosRef.current.label = ""; // reset after handling
+    }
+  }, 100);
+
+  return () => clearInterval(interval);
+}, [fingerPosRef, handleCellActivated]);
 
   // 🖐 Finger tracking
   React.useEffect(() => {
+    if (fingerPosRef.current?.label !== "cursor") return;
     const interval = setInterval(() => {
       const cur = fingerPosRef.current;
       // Get the current position from the controlled state for reliability
