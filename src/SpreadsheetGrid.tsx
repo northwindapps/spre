@@ -163,29 +163,80 @@ export default function SpreadsheetGrid({
     return () => recognition.stop();
   }, []);
 
+
+  // cell selection
   React.useEffect(() => {
   const interval = setInterval(() => {
     const pos = fingerPosRef.current;
     if (!pos || pos.label !== "click") return;
 
-    // 🔍 get current cell from selection OR ref
-    const active = gridSelection?.current?.cell ?? (
-      activeCellRef.current
+    // fallback: use activeCellRef when grid is not focused
+    const selected =
+      gridSelection?.current?.cell ??
+      (activeCellRef.current
         ? [activeCellRef.current.col, activeCellRef.current.row] as [number, number]
-        : null
-    );
+        : null);
 
-    if (!active) {
-      // nothing selected → do nothing
-      pos.label = ""; // still clear click
-      return;
+    if (selected) {
+      selectCell(selected[0], selected[1]);
+      handleCellActivated(selected);
     }
 
-    // ✨ safe: activate the existing cell
+    pos.label = "";
+  }, 100);
+
+  return () => clearInterval(interval);
+}, [gridSelection]);
+
+function selectCell(col: number, row: number) {
+  const id = getCellId(col, row);
+
+  // update ref (does NOT rerender)
+  activeCellRef.current = { col, row, id };
+
+  // update selection (this updates UI)
+  setGridSelection({
+    current: {
+      cell: [col, row],
+      range: { x: col, y: row, width: 1, height: 1 },
+      rangeStack: [],
+    },
+    columns: CompactSelection.empty(),
+    rows: CompactSelection.empty(),
+  });
+}
+
+
+
+React.useEffect(() => {
+  const interval = setInterval(() => {
+    const pos = fingerPosRef.current;
+    if (!pos || pos.label !== "click") return;
+
+    // 1️⃣ Try selection from state
+    let active = gridSelection?.current?.cell;
+
+    // 2️⃣ If no selection, try ref
+    if (!active && activeCellRef.current) {
+      active = [activeCellRef.current.col, activeCellRef.current.row];
+    }
+
+    // 3️⃣ If STILL nothing → default to (1,1)
+    if (!active) {
+      active = [1, 1];
+      selectCell(1, 1);                          // <-- soft selection
+      activeCellRef.current = {
+        col: 1,
+        row: 1,
+        id: getCellId(1, 1)
+      };
+    }
+
+    // 4️⃣ Now activate safely
+    selectCell(active[0], active[1]);
     handleCellActivated(active);
 
-    // Reset click state
-    pos.label = "";
+    pos.label = ""; // reset click
   }, 100);
 
   return () => clearInterval(interval);
