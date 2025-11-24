@@ -138,30 +138,38 @@ export default function SpreadsheetGrid({
 
   // 🎤 --- SPEECH RECOGNITION SETUP ---
   React.useEffect(() => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!isEditing) return;
 
-    if (!SpeechRecognition) return;
+  const SpeechRecognition =
+    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SpeechRecognition) return;
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.continuous = true;
-    recognition.interimResults = true;
+  const recognition = new SpeechRecognition();
+  let active = true; // <— add this
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-      setCellValue(transcript);
-    };
+  recognition.lang = "en-US";
+  recognition.continuous = true;
+  recognition.interimResults = true;
 
-    recognition.onend = () => recognition.start(); // auto-restart
+  recognition.onresult = (event:SpeechRecognitionEvent) => {
+    let transcript = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    setCellValue(transcript);
+  };
 
-    recognition.start();
+  recognition.onend = () => {
+    if (active) recognition.start();  // only restart if modal still open
+  };
 
-    return () => recognition.stop();
-  }, []);
+  recognition.start();
+
+  return () => {
+    active = false;                   // <— stops auto-restart
+    recognition.stop();
+  };
+}, [isEditing]);
 
 
   // cell selection
@@ -352,7 +360,6 @@ React.useEffect(() => {
 
     return () => clearInterval(interval);
   }, []);
-  // 🎤 --- END SPEECH RECOGNITION ---
   return (
     <div style={{ height: "80vh", width: "100%", position: "relative" }}>
       <div style={{ display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }}>

@@ -16,7 +16,7 @@ export default function HandDetector({ onFingerMove }) {
     const canvasRef = useRef(null);
     const lastLogRef = useRef("");
     let openPoseCount = 0;
-    const REQUIRED_FRAMES = 5; // tune this (5–10 works well)
+    const REQUIRED_FRAMES = 8; // tune this (5–10 works well)
     useEffect(() => {
         if (!videoRef.current)
             return;
@@ -116,6 +116,7 @@ export default function HandDetector({ onFingerMove }) {
                 const indexTip = lm[0];
                 openPoseCount += 1;
                 if (REQUIRED_FRAMES >= openPoseCount) {
+                    openPoseCount = 0;
                     onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "click", ts: ts });
                 }
             }

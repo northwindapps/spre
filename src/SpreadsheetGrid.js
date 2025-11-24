@@ -101,10 +101,13 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
     };
     // 🎤 --- SPEECH RECOGNITION SETUP ---
     React.useEffect(() => {
+        if (!isEditing)
+            return;
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition)
             return;
         const recognition = new SpeechRecognition();
+        let active = true; // <— add this
         recognition.lang = "en-US";
         recognition.continuous = true;
         recognition.interimResults = true;
@@ -115,10 +118,16 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
             }
             setCellValue(transcript);
         };
-        recognition.onend = () => recognition.start(); // auto-restart
+        recognition.onend = () => {
+            if (active)
+                recognition.start(); // only restart if modal still open
+        };
         recognition.start();
-        return () => recognition.stop();
-    }, []);
+        return () => {
+            active = false; // <— stops auto-restart
+            recognition.stop();
+        };
+    }, [isEditing]);
     // cell selection
     React.useEffect(() => {
         const interval = setInterval(() => {
@@ -277,7 +286,6 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
         }, 150); //50 A slightly faster interval can feel more responsive
         return () => clearInterval(interval);
     }, []);
-    // 🎤 --- END SPEECH RECOGNITION ---
     return (_jsxs("div", { style: { height: "80vh", width: "100%", position: "relative" }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }, children: [_jsxs("button", { onClick: () => setFillDirection((prev) => (prev === "horizontal" ? "vertical" : "horizontal")), children: ["\uD83D\uDD04 Direction: ", fillDirection === "horizontal" ? "Horizontal →" : "Vertical ↓"] }), _jsx("button", { onClick: handleExportCSV, children: "\u2B07\uFE0F Export CSV" })] }), _jsx(DataEditor, { ref: gridRef, columns: columns, rows: totalRows, getCellContent: getCellContent, freezeColumns: 1, freezeTrailingRows: 1, rowHeight: 28, headerHeight: 32, onCellActivated: handleCellActivated, onCellClicked: (cell) => {
                     var _a;
                     const [col, row] = cell;
