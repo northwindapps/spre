@@ -106,12 +106,6 @@ export default function HandDetector({ onFingerMove }) {
                 console.log(currentStatusStr);
                 lastLogRef.current = currentStatusStr;
             }
-            // share index inger movements
-            if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL") {
-                const indexTip = lm[8];
-                openPoseCount = 0;
-                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "cursor", ts: ts });
-            }
             if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "OPEN" && statusMap["Middle"] == "OPEN" && statusMap["Pinky"] == "OPEN" && statusMap["Ring"] == "OPEN") {
                 const indexTip = lm[0];
                 openPoseCount += 1;
@@ -119,6 +113,18 @@ export default function HandDetector({ onFingerMove }) {
                     openPoseCount = 0;
                     onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "click", ts: ts });
                 }
+            }
+            // ok
+            else if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "OPEN" && statusMap["Pinky"] == "CURL" && statusMap["Ring"] == "CURL") {
+                const indexTip = lm[8];
+                // openPoseCount = 0;
+                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "ok", ts: ts });
+            }
+            // share index inger movements
+            else if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL") {
+                const indexTip = lm[8];
+                openPoseCount = 0;
+                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "cursor", ts: ts });
             }
         });
         camera = new Camera(videoRef.current, {

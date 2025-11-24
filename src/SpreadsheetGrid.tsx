@@ -20,7 +20,7 @@ export default function SpreadsheetGrid({
   const prevFingerPosRef = React.useRef<{ x: number; y: number, label: string, ts:number  } | null>(null);
   const prevVelocityRef = React.useRef<{ vx: number; vy: number; ts:number  } | null>(null);
   const gridRef = React.useRef<DataEditorRef | null>(null);
-
+  const latestTranscriptRef = React.useRef("");
   const [isEditing, setIsEditing] = React.useState(false);
 
   const [cellValue, setCellValue] = React.useState("");
@@ -81,36 +81,37 @@ export default function SpreadsheetGrid({
     [values]
   );
 
+  const handleSave = (cellSnapshot = activeCellRef.current, value?: string) => {
+  if (!cellSnapshot) return;
+  const { col, row } = cellSnapshot;
+  const text = ((value ?? cellValue) || "").trim(); // use value if provided
 
-  const handleSave = () => {
-    if (!activeCellRef.current) return;
+  if (!text) {
+    setValues(prev => ({ ...prev, [getCellId(col, row)]: "" }));
+    setIsEditing(false);
+    return;
+  }
 
-    const parts = cellValue.split(":").map(v => v.trim()).filter(Boolean);
+  const parts = text.split(":").map(v => v.trim()).filter(Boolean);
 
-    setValues(prev => {
-      const newValues = { ...prev };
-
-      parts.forEach((part, i) => {
-        const { col, row } = activeCellRef.current!;
-
-        if (fillDirection === "horizontal") {
-          const targetCol = col + i;
-          if (targetCol < columns.length) {
-            newValues[getCellId(targetCol, row)] = part;
-          }
-        } else {
-          const targetRow = row + i;
-          if (targetRow < totalRows) {
-            newValues[getCellId(col, targetRow)] = part;
-          }
-        }
-      });
-
-      return newValues;
+  setValues(prev => {
+    const newValues = { ...prev };
+    parts.forEach((part, i) => {
+      if (fillDirection === "horizontal") {
+        const targetCol = col + i;
+        if (targetCol < columns.length) newValues[getCellId(targetCol, row)] = part;
+      } else {
+        const targetRow = row + i;
+        if (targetRow < totalRows) newValues[getCellId(col, targetRow)] = part;
+      }
     });
+    return newValues;
+  });
 
-    setIsEditing(false);   // close modal
-  };
+  setIsEditing(false);
+};
+
+
 
   const handleExportCSV = () => {
     const rows: string[][] = [];
@@ -157,6 +158,10 @@ export default function SpreadsheetGrid({
       transcript += event.results[i][0].transcript;
     }
     setCellValue(transcript);
+    // testing
+    if (transcript !== '') {
+      latestTranscriptRef.current = transcript;
+    }
   };
 
   recognition.onend = () => {
@@ -173,28 +178,28 @@ export default function SpreadsheetGrid({
 
 
   // cell selection
-  React.useEffect(() => {
-  const interval = setInterval(() => {
-    const pos = fingerPosRef.current;
-    if (!pos || pos.label !== "click") return;
+//   React.useEffect(() => {
+//   const interval = setInterval(() => {
+//     const pos = fingerPosRef.current;
+//     if (!pos || pos.label !== "click") return;
 
-    // fallback: use activeCellRef when grid is not focused
-    const selected =
-      gridSelection?.current?.cell ??
-      (activeCellRef.current
-        ? [activeCellRef.current.col, activeCellRef.current.row] as [number, number]
-        : null);
+//     // fallback: use activeCellRef when grid is not focused
+//     const selected =
+//       gridSelection?.current?.cell ??
+//       (activeCellRef.current
+//         ? [activeCellRef.current.col, activeCellRef.current.row] as [number, number]
+//         : null);
 
-    if (selected) {
-      selectCell(selected[0], selected[1]);
-      handleCellActivated(selected);
-    }
+//     if (selected) {
+//       selectCell(selected[0], selected[1]);
+//       handleCellActivated(selected);
+//     }
 
-    pos.label = "";
-  }, 100);
+//     pos.label = "";
+//   }, 100);
 
-  return () => clearInterval(interval);
-}, [gridSelection]);
+//   return () => clearInterval(interval);
+// }, [gridSelection]);
 
 function selectCell(col: number, row: number) {
   const id = getCellId(col, row);
@@ -213,43 +218,6 @@ function selectCell(col: number, row: number) {
     rows: CompactSelection.empty(),
   });
 }
-
-
-
-React.useEffect(() => {
-  const interval = setInterval(() => {
-    const pos = fingerPosRef.current;
-    if (!pos || pos.label !== "click") return;
-
-    // 1️⃣ Try selection from state
-    let active = gridSelection?.current?.cell;
-
-    // 2️⃣ If no selection, try ref
-    if (!active && activeCellRef.current) {
-      active = [activeCellRef.current.col, activeCellRef.current.row];
-    }
-
-    // 3️⃣ If STILL nothing → default to (1,1)
-    if (!active) {
-      active = [1, 1];
-      selectCell(1, 1);                          // <-- soft selection
-      activeCellRef.current = {
-        col: 1,
-        row: 1,
-        id: getCellId(1, 1)
-      };
-    }
-
-    // 4️⃣ Now activate safely
-    selectCell(active[0], active[1]);
-    handleCellActivated(active);
-
-    pos.label = ""; // reset click
-  }, 100);
-
-  return () => clearInterval(interval);
-}, [gridSelection]);
-
 
   // 🖐 Finger tracking
   React.useEffect(() => {
@@ -360,7 +328,47 @@ React.useEffect(() => {
 
     return () => clearInterval(interval);
   }, []);
-  return (
+
+  React.useEffect(() => {
+  const interval = setInterval(() => {
+    const pos = fingerPosRef.current;
+    if (!pos) return;
+    if (pos.label === "ok") {
+      if (pos.label === "ok" && isEditing) {
+      const snapshot = activeCellRef.current!;
+      handleSave(snapshot, latestTranscriptRef.current);
+      pos.label = "";
+      return;
+    }
+    }
+
+    if (isEditing) return;
+    if(pos.label == "click"){
+      let active =
+        gridSelection?.current?.cell ??
+        (activeCellRef.current
+          ? [activeCellRef.current.col, activeCellRef.current.row]
+          : null);
+
+      if (!active) {
+        active = [1, 1];
+        selectCell(1, 1);
+      }
+
+      selectCell(active[0], active[1]);
+      handleCellActivated(active);
+
+      pos.label = "";
+    }
+  }, 100);
+
+
+  return () => clearInterval(interval);
+}, [isEditing, gridSelection]);
+
+const manualHandleSave = () => { if (!activeCellRef.current) return; const parts = cellValue.split(":").map(v => v.trim()).filter(Boolean); setValues(prev => { const newValues = { ...prev }; parts.forEach((part, i) => { const { col, row } = activeCellRef.current!; if (fillDirection === "horizontal") { const targetCol = col + i; if (targetCol < columns.length) { newValues[getCellId(targetCol, row)] = part; } } else { const targetRow = row + i; if (targetRow < totalRows) { newValues[getCellId(col, targetRow)] = part; } } }); return newValues; }); setIsEditing(false);};
+  
+return (
     <div style={{ height: "80vh", width: "100%", position: "relative" }}>
       <div style={{ display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }}>
         <button
@@ -416,20 +424,19 @@ React.useEffect(() => {
           <h3>Edit Cell {activeCellRef.current.id}</h3>
           <textarea
             value={cellValue}
-            onChange={(e) => setCellValue(e.target.value)}
+             onChange={(e) => {
+              setCellValue(e.target.value);  // update state
+              console.log("Textarea changed:", e.target.value); // log new value
+            }}
             style={{ width: "100%", height: "80px", marginBottom: "1rem" }}
             placeholder="Speak or type here..."
           />
           <div style={{ textAlign: "right" }}>
             <button onClick={() => setIsEditing(false)}>Cancel</button>
-            <button onClick={handleSave}>Save</button>
+            <button onClick={manualHandleSave}>Save</button>
           </div>
         </div>
       )}
     </div>
   );
 }
-function onCellClicked(arg0: { col: number; row: number; }, arg1: { kind: string; button: number; }) {
-  throw new Error("Function not implemented.");
-}
-
