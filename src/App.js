@@ -13,9 +13,9 @@ function App() {
                     height: "100%",
                     pointerEvents: "none", // so it doesn’t block mouse
                     zIndex: 9999,
-                }, children: _jsx(HandDetector, { onFingerMove: ({ x, y, label }) => {
+                }, children: _jsx(HandDetector, { onFingerMove: ({ x, y, label, ts }) => {
                         // Update ref directly, no re-render
-                        fingerPosRef.current = { x, y, label };
+                        fingerPosRef.current = { x, y, label, ts };
                     } }) })] }));
 }
 export default App;

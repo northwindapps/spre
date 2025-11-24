@@ -13,13 +13,14 @@ import "@glideapps/glide-data-grid/dist/index.css";
 export default function SpreadsheetGrid({
   fingerPosRef,
 }: {
-  fingerPosRef: React.RefObject<{ x: number; y: number; label: string } | null>;
+  fingerPosRef: React.RefObject<{ x: number; y: number; label: string; ts: number } | null>;
 }) {
   const [values, setValues] = React.useState<Record<string, string>>({});
   const activeCellRef = React.useRef<{ col: number; row: number; id: string } | null>(null);
-  const prevFingerPosRef = React.useRef<{ x: number; y: number, label: string } | null>(null);
+  const prevFingerPosRef = React.useRef<{ x: number; y: number, label: string, ts:number  } | null>(null);
+  const prevVelocityRef = React.useRef<{ vx: number; vy: number; ts:number  } | null>(null);
   const gridRef = React.useRef<DataEditorRef | null>(null);
-
+  const latestTranscriptRef = React.useRef("");
   const [isEditing, setIsEditing] = React.useState(false);
 
   const [cellValue, setCellValue] = React.useState("");
@@ -80,36 +81,37 @@ export default function SpreadsheetGrid({
     [values]
   );
 
+  const handleSave = (cellSnapshot = activeCellRef.current, value?: string) => {
+  if (!cellSnapshot) return;
+  const { col, row } = cellSnapshot;
+  const text = ((value ?? cellValue) || "").trim(); // use value if provided
 
-  const handleSave = () => {
-    if (!activeCellRef.current) return;
+  if (!text) {
+    setValues(prev => ({ ...prev, [getCellId(col, row)]: "" }));
+    setIsEditing(false);
+    return;
+  }
 
-    const parts = cellValue.split(":").map(v => v.trim()).filter(Boolean);
+  const parts = text.split(":").map(v => v.trim()).filter(Boolean);
 
-    setValues(prev => {
-      const newValues = { ...prev };
-
-      parts.forEach((part, i) => {
-        const { col, row } = activeCellRef.current!;
-
-        if (fillDirection === "horizontal") {
-          const targetCol = col + i;
-          if (targetCol < columns.length) {
-            newValues[getCellId(targetCol, row)] = part;
-          }
-        } else {
-          const targetRow = row + i;
-          if (targetRow < totalRows) {
-            newValues[getCellId(col, targetRow)] = part;
-          }
-        }
-      });
-
-      return newValues;
+  setValues(prev => {
+    const newValues = { ...prev };
+    parts.forEach((part, i) => {
+      if (fillDirection === "horizontal") {
+        const targetCol = col + i;
+        if (targetCol < columns.length) newValues[getCellId(targetCol, row)] = part;
+      } else {
+        const targetRow = row + i;
+        if (targetRow < totalRows) newValues[getCellId(col, targetRow)] = part;
+      }
     });
+    return newValues;
+  });
 
-    setIsEditing(false);   // close modal
-  };
+  setIsEditing(false);
+};
+
+
 
   const handleExportCSV = () => {
     const rows: string[][] = [];
@@ -137,81 +139,158 @@ export default function SpreadsheetGrid({
 
   // 🎤 --- SPEECH RECOGNITION SETUP ---
   React.useEffect(() => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!isEditing) return;
 
-    if (!SpeechRecognition) return;
+  const SpeechRecognition =
+    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SpeechRecognition) return;
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.continuous = true;
-    recognition.interimResults = true;
+  const recognition = new SpeechRecognition();
+  let active = true; // <— add this
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-      setCellValue(transcript);
-    };
+  recognition.lang = "en-US";
+  recognition.continuous = true;
+  recognition.interimResults = true;
 
-    recognition.onend = () => recognition.start(); // auto-restart
+  recognition.onresult = (event:SpeechRecognitionEvent) => {
+    let transcript = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    setCellValue(transcript);
+    // testing
+    if (transcript !== '') {
+      latestTranscriptRef.current = transcript;
+    }
+  };
 
-    recognition.start();
+  recognition.onend = () => {
+    if (active) recognition.start();  // only restart if modal still open
+  };
 
-    return () => recognition.stop();
-  }, []);
+  recognition.start();
 
-  React.useEffect(() => {
-    if (fingerPosRef.current?.label === "click") {
-        const fakeCell: Item = [1, 1];
-        handleCellActivated(fakeCell);
-      } // run after 0.2s
-  }, [fingerPosRef.current?.label]);
+  return () => {
+    active = false;                   // <— stops auto-restart
+    recognition.stop();
+  };
+}, [isEditing]);
+
+
+  // cell selection
+//   React.useEffect(() => {
+//   const interval = setInterval(() => {
+//     const pos = fingerPosRef.current;
+//     if (!pos || pos.label !== "click") return;
+
+//     // fallback: use activeCellRef when grid is not focused
+//     const selected =
+//       gridSelection?.current?.cell ??
+//       (activeCellRef.current
+//         ? [activeCellRef.current.col, activeCellRef.current.row] as [number, number]
+//         : null);
+
+//     if (selected) {
+//       selectCell(selected[0], selected[1]);
+//       handleCellActivated(selected);
+//     }
+
+//     pos.label = "";
+//   }, 100);
+
+//   return () => clearInterval(interval);
+// }, [gridSelection]);
+
+function selectCell(col: number, row: number) {
+  const id = getCellId(col, row);
+
+  // update ref (does NOT rerender)
+  activeCellRef.current = { col, row, id };
+
+  // update selection (this updates UI)
+  setGridSelection({
+    current: {
+      cell: [col, row],
+      range: { x: col, y: row, width: 1, height: 1 },
+      rangeStack: [],
+    },
+    columns: CompactSelection.empty(),
+    rows: CompactSelection.empty(),
+  });
+}
 
   // 🖐 Finger tracking
   React.useEffect(() => {
     const interval = setInterval(() => {
+      if (fingerPosRef.current?.label !== "cursor") return;
       const cur = fingerPosRef.current;
       // Get the current position from the controlled state for reliability
-      const currentCell = gridSelection?.current?.cell;
-      if (!cur || !currentCell) {
-          // If we don't have a selection, try to fall back to the ref from the last activation
-          if (!cur || !activeCellRef.current) return;
-      }
+      const currentCol = activeCellRef.current?.col;
+      const currentRow = activeCellRef.current?.row;
+      if (currentCol == null || currentRow == null) return;
 
-      const prev = prevFingerPosRef.current;
-      if (!prev) {
-        prevFingerPosRef.current = { ...cur };
-        return;
-      }
+      // Get previous samples
+    const prev = prevFingerPosRef.current;
+    const prevVel = prevVelocityRef.current;
 
-      const dx = cur.x - prev.x;
-      const dy = cur.y - prev.y;
-      const PIXEL_SCALE = 500;
-      const dxScaled = dx * PIXEL_SCALE;
-      const dyScaled = dy * PIXEL_SCALE;
-      const distanceScaled = Math.sqrt(dxScaled * dxScaled + dyScaled * dyScaled);
+    // First frame
+    if (!prev) {
+      prevFingerPosRef.current = { ...cur };
+      prevVelocityRef.current = { vx: 0, vy: 0, ts: cur.ts };
+      return;
+    }
 
-      // A dead zone to prevent jitter
-      if (distanceScaled < 10) return;
+    const dt = (cur.ts - prev.ts) / 1000; // convert ms → seconds
+    if (dt <= 0) return;
+
+    const ALPHA = 0.2; // smoothness (smaller = smoother)
+
+    const rawVx = (cur.x - prev.x) / dt;
+    const rawVy = (cur.y - prev.y) / dt;
+
+    const vx = prevVel ? prevVel.vx * (1 - ALPHA) + rawVx * ALPHA : rawVx;
+    const vy = prevVel ? prevVel.vy * (1 - ALPHA) + rawVy * ALPHA : rawVy;
+
+
+    // --- First velocity frame ---
+    if (!prevVel) {
+      prevVelocityRef.current = { vx, vy, ts: cur.ts };
+      prevFingerPosRef.current = { ...cur };
+      return;
+    }
+
+    // --- Acceleration ---
+    // const ax = (vx - prevVel.vx) / dt;
+    // const ay = (vy - prevVel.vy) / dt;
+
+    // scale to pixel movement
+    const SCALE = 200;  // adjust this to your taste
+    const moveX = vx * SCALE;
+    const moveY = vy * SCALE;
+
+    // threshold to avoid jitter
+    if (Math.abs(moveX) + Math.abs(moveY) < 1) {
+      prevFingerPosRef.current = { ...cur };
+      prevVelocityRef.current = { vx, vy, ts: cur.ts };
+      return;
+    }
+
 
       // Use the controlled state as the source of truth, with a fallback to the ref
-      const oldCol = currentCell ? currentCell[0] : activeCellRef.current!.col;
-      const oldRow = currentCell ? currentCell[1] : activeCellRef.current!.row;
-      
+      let oldCol = currentCol;
+      let oldRow = currentRow;
       let newCol = oldCol;
       let newRow = oldRow;
 
       // ✨ 1. Decide if the move is mostly horizontal or vertical
-      if (Math.abs(dxScaled) > Math.abs(dyScaled)) {
+      if (Math.abs(moveX) > Math.abs(moveY)) {
         // Horizontal move (your existing logic)
-        if (dxScaled > 10) newCol = oldCol + 1; // MOVE RIGHT
-        else if (dxScaled < -10) newCol = oldCol - 1; // MOVE LEFT
+        if (moveX > 15) newCol = oldCol + 1; // MOVE RIGHT
+        else if (moveX < -15) newCol = oldCol - 1; // MOVE LEFT
       } else {
         // ✨ 2. Vertical move (new logic)
-        if (dyScaled > 10) newRow = oldRow + 1; // MOVE DOWN
-        else if (dyScaled < -10) newRow = oldRow - 1; // MOVE UP
+        if (moveY > 15) newRow = oldRow + 1; // MOVE DOWN
+        else if (moveY < -15) newRow = oldRow - 1; // MOVE UP
       }
 
       // ✨ 3. Check if a move was made and if it's within bounds
@@ -241,13 +320,55 @@ export default function SpreadsheetGrid({
         gridRef.current?.scrollTo(newCol, newRow);
       }
 
+      
+      // update history
       prevFingerPosRef.current = { ...cur };
-    }, 50); // A slightly faster interval can feel more responsive
+      prevVelocityRef.current = { vx, vy, ts: cur.ts };
+    }, 150); //50 A slightly faster interval can feel more responsive
 
     return () => clearInterval(interval);
-  }, [fingerPosRef, columns, values, getCellId, gridSelection, totalRows]); // ✨ Add totalRows
-  // 🎤 --- END SPEECH RECOGNITION ---
-  return (
+  }, []);
+
+  React.useEffect(() => {
+  const interval = setInterval(() => {
+    const pos = fingerPosRef.current;
+    if (!pos) return;
+    if (pos.label === "ok") {
+      if (pos.label === "ok" && isEditing) {
+      const snapshot = activeCellRef.current!;
+      handleSave(snapshot, latestTranscriptRef.current);
+      pos.label = "";
+      return;
+    }
+    }
+
+    if (isEditing) return;
+    if(pos.label == "click"){
+      let active =
+        gridSelection?.current?.cell ??
+        (activeCellRef.current
+          ? [activeCellRef.current.col, activeCellRef.current.row]
+          : null);
+
+      if (!active) {
+        active = [1, 1];
+        selectCell(1, 1);
+      }
+
+      selectCell(active[0], active[1]);
+      handleCellActivated(active);
+
+      pos.label = "";
+    }
+  }, 100);
+
+
+  return () => clearInterval(interval);
+}, [isEditing, gridSelection]);
+
+const manualHandleSave = () => { if (!activeCellRef.current) return; const parts = cellValue.split(":").map(v => v.trim()).filter(Boolean); setValues(prev => { const newValues = { ...prev }; parts.forEach((part, i) => { const { col, row } = activeCellRef.current!; if (fillDirection === "horizontal") { const targetCol = col + i; if (targetCol < columns.length) { newValues[getCellId(targetCol, row)] = part; } } else { const targetRow = row + i; if (targetRow < totalRows) { newValues[getCellId(col, targetRow)] = part; } } }); return newValues; }); setIsEditing(false);};
+  
+return (
     <div style={{ height: "80vh", width: "100%", position: "relative" }}>
       <div style={{ display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }}>
         <button
@@ -303,20 +424,19 @@ export default function SpreadsheetGrid({
           <h3>Edit Cell {activeCellRef.current.id}</h3>
           <textarea
             value={cellValue}
-            onChange={(e) => setCellValue(e.target.value)}
+             onChange={(e) => {
+              setCellValue(e.target.value);  // update state
+              console.log("Textarea changed:", e.target.value); // log new value
+            }}
             style={{ width: "100%", height: "80px", marginBottom: "1rem" }}
             placeholder="Speak or type here..."
           />
           <div style={{ textAlign: "right" }}>
             <button onClick={() => setIsEditing(false)}>Cancel</button>
-            <button onClick={handleSave}>Save</button>
+            <button onClick={manualHandleSave}>Save</button>
           </div>
         </div>
       )}
     </div>
   );
 }
-function onCellClicked(arg0: { col: number; row: number; }, arg1: { kind: string; button: number; }) {
-  throw new Error("Function not implemented.");
-}
-

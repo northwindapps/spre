@@ -3,13 +3,16 @@ import { Camera } from "@mediapipe/camera_utils";
 import * as fp from "fingerpose";
 import { useEffect, useRef } from "react";
 interface HandDetectorProps {
-  onFingerMove?: (pos: { x: number; y: number; label: string }) => void;
+  onFingerMove?: (pos: { x: number; y: number; label: string; ts: number }) => void;
 }
 
 export default function HandDetector({ onFingerMove }: HandDetectorProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const lastLogRef = useRef<string>("");
+  let openPoseCount = 0;
+  const REQUIRED_FRAMES = 8; // tune this (5–10 works well)
+
 
   useEffect(() => {
   if (!videoRef.current) return;
@@ -35,6 +38,7 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
   };
 
   hands.onResults((results: Results) => {
+    const ts = Date.now();
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
@@ -122,16 +126,30 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
         console.log(currentStatusStr);
         lastLogRef.current = currentStatusStr;
       }
-      // share index inger movements
-      if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL"){
-        const indexTip = lm[8];
-        onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "cursor" });
+      
+      if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "OPEN" && statusMap["Middle"] == "OPEN" && statusMap["Pinky"] == "OPEN" && statusMap["Ring"] == "OPEN"){
+        const indexTip = lm[0];
+        openPoseCount += 1;
+        if (REQUIRED_FRAMES >= openPoseCount){
+          openPoseCount = 0;
+          onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "click", ts:ts  });
+        }
       }
-      if (statusMap["Index"] == "CURL" && statusMap["Thumb"] == "OPEN" && statusMap["Middle"] == "CURL"){
+      // ok
+      else if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "OPEN" && statusMap["Pinky"] == "CURL" && statusMap["Ring"] == "CURL"){
         const indexTip = lm[8];
-        onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "click" });
+        // openPoseCount = 0;
+        onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "ok", ts:ts });
+      }
+
+      // share index inger movements
+      else if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL"){
+        const indexTip = lm[8];
+        openPoseCount = 0;
+        onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "cursor", ts:ts });
       }
     });
+
 
   camera = new Camera(videoRef.current, {
     onFrame: async () => {
@@ -155,7 +173,15 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
   return (
     <div>
       <video ref={videoRef} style={{ display: "none" }} />
-      <canvas ref={canvasRef} width={640} height={480} />
+      {/* <canvas ref={canvasRef} width={640} height={480} /> */}
+      <canvas
+        ref={canvasRef}
+        style={{
+          width: "100%",    // stretches to parent width
+          height: "100%",   // stretches to parent height
+          objectFit: "cover", // optional, preserves aspect
+        }}
+      />
     </div>
   );
 }

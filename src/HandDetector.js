@@ -15,6 +15,8 @@ export default function HandDetector({ onFingerMove }) {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const lastLogRef = useRef("");
+    let openPoseCount = 0;
+    const REQUIRED_FRAMES = 8; // tune this (5–10 works well)
     useEffect(() => {
         if (!videoRef.current)
             return;
@@ -34,6 +36,7 @@ export default function HandDetector({ onFingerMove }) {
             return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
         };
         hands.onResults((results) => {
+            const ts = Date.now();
             const canvas = canvasRef.current;
             const ctx = canvas === null || canvas === void 0 ? void 0 : canvas.getContext("2d");
             if (!canvas || !ctx)
@@ -103,14 +106,25 @@ export default function HandDetector({ onFingerMove }) {
                 console.log(currentStatusStr);
                 lastLogRef.current = currentStatusStr;
             }
-            // share index inger movements
-            if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL") {
-                const indexTip = lm[8];
-                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "cursor" });
+            if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "OPEN" && statusMap["Middle"] == "OPEN" && statusMap["Pinky"] == "OPEN" && statusMap["Ring"] == "OPEN") {
+                const indexTip = lm[0];
+                openPoseCount += 1;
+                if (REQUIRED_FRAMES >= openPoseCount) {
+                    openPoseCount = 0;
+                    onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "click", ts: ts });
+                }
             }
-            if (statusMap["Index"] == "CURL" && statusMap["Thumb"] == "OPEN" && statusMap["Middle"] == "CURL") {
+            // ok
+            else if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "OPEN" && statusMap["Pinky"] == "CURL" && statusMap["Ring"] == "CURL") {
                 const indexTip = lm[8];
-                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "click" });
+                // openPoseCount = 0;
+                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "ok", ts: ts });
+            }
+            // share index inger movements
+            else if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL") {
+                const indexTip = lm[8];
+                openPoseCount = 0;
+                onFingerMove === null || onFingerMove === void 0 ? void 0 : onFingerMove({ x: indexTip.x, y: indexTip.y, label: "cursor", ts: ts });
             }
         });
         camera = new Camera(videoRef.current, {
@@ -129,5 +143,9 @@ export default function HandDetector({ onFingerMove }) {
             hands.close();
         };
     }, [onFingerMove]);
-    return (_jsxs("div", { children: [_jsx("video", { ref: videoRef, style: { display: "none" } }), _jsx("canvas", { ref: canvasRef, width: 640, height: 480 })] }));
+    return (_jsxs("div", { children: [_jsx("video", { ref: videoRef, style: { display: "none" } }), _jsx("canvas", { ref: canvasRef, style: {
+                    width: "100%", // stretches to parent width
+                    height: "100%", // stretches to parent height
+                    objectFit: "cover", // optional, preserves aspect
+                } })] }));
 }
