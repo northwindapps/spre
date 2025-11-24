@@ -11,7 +11,8 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const lastLogRef = useRef<string>("");
   let openPoseCount = 0;
-  const REQUIRED_FRAMES = 8; // tune this (5–10 works well)
+  let openPoseCancelCount = 0;
+  const REQUIRED_FRAMES = 20; // tune this (5–10 works well)
 
 
   useEffect(() => {
@@ -127,6 +128,16 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
         lastLogRef.current = currentStatusStr;
       }
       
+      //cancel
+      if (statusMap["Index"] == "CURL" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL" && statusMap["Pinky"] == "CURL" && statusMap["Ring"] == "CURL"){
+        const indexTip = lm[0];
+        openPoseCancelCount += 1;
+        if (REQUIRED_FRAMES >= openPoseCancelCount){
+          openPoseCancelCount = 0;
+          onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "cancel", ts:ts  });
+        }
+      }
+      // click
       if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "OPEN" && statusMap["Middle"] == "OPEN" && statusMap["Pinky"] == "OPEN" && statusMap["Ring"] == "OPEN"){
         const indexTip = lm[0];
         openPoseCount += 1;
@@ -142,7 +153,7 @@ export default function HandDetector({ onFingerMove }: HandDetectorProps) {
         onFingerMove?.({ x: indexTip.x, y: indexTip.y, label: "ok", ts:ts });
       }
 
-      // share index inger movements
+      // cursor
       else if (statusMap["Index"] == "OPEN" && statusMap["Thumb"] == "CURL" && statusMap["Middle"] == "CURL"){
         const indexTip = lm[8];
         openPoseCount = 0;

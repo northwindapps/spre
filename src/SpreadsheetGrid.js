@@ -272,13 +272,16 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
             const pos = fingerPosRef.current;
             if (!pos)
                 return;
-            if (pos.label === "ok") {
-                if (pos.label === "ok" && isEditing) {
-                    const snapshot = activeCellRef.current;
-                    handleSave(snapshot, latestTranscriptRef.current);
-                    pos.label = "";
-                    return;
-                }
+            if (pos.label === "ok" && isEditing) {
+                const snapshot = activeCellRef.current;
+                handleSave(snapshot, latestTranscriptRef.current);
+                pos.label = "";
+                return;
+            }
+            if (pos.label === "cancel" && isEditing) {
+                setIsEditing(false);
+                pos.label = "";
+                return;
             }
             if (isEditing)
                 return;
