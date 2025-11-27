@@ -10,6 +10,7 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
     const gridRef = React.useRef(null);
     const latestTranscriptRef = React.useRef("");
     const [isEditing, setIsEditing] = React.useState(false);
+    const [transcripts, setTranscripts] = React.useState([]);
     const [cellValue, setCellValue] = React.useState("");
     const [fillDirection, setFillDirection] = React.useState("horizontal");
     const [gridSelection, setGridSelection] = React.useState();
@@ -121,10 +122,23 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 transcript += event.results[i][0].transcript;
             }
-            setCellValue(transcript);
-            // testing
-            if (transcript !== '') {
-                latestTranscriptRef.current = transcript;
+            const trimmed = transcript.trim();
+            setCellValue(trimmed);
+            const normalized = normalizeNumber(transcript); // returns string like "1", "2", "3"
+            if (normalized !== null) {
+                const index = Number(normalized) - 1; // convert 1-based → 0-based
+                if (!isNaN(index) && transcripts[index] !== undefined) {
+                    setCellValue(transcripts[index]); // set cell to that history item
+                    latestTranscriptRef.current = transcripts[index];
+                    return; // exit early
+                }
+            }
+            // 📝 fallback normal behavior
+            if (trimmed !== "") {
+                latestTranscriptRef.current = trimmed;
+            }
+            if (event.results[event.resultIndex].isFinal && trimmed) {
+                setTranscripts(prev => prev.indexOf(trimmed) !== -1 ? prev : [...prev, trimmed]);
             }
         };
         recognition.onend = () => {
@@ -137,25 +151,27 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
             recognition.stop();
         };
     }, [isEditing]);
-    // cell selection
-    //   React.useEffect(() => {
-    //   const interval = setInterval(() => {
-    //     const pos = fingerPosRef.current;
-    //     if (!pos || pos.label !== "click") return;
-    //     // fallback: use activeCellRef when grid is not focused
-    //     const selected =
-    //       gridSelection?.current?.cell ??
-    //       (activeCellRef.current
-    //         ? [activeCellRef.current.col, activeCellRef.current.row] as [number, number]
-    //         : null);
-    //     if (selected) {
-    //       selectCell(selected[0], selected[1]);
-    //       handleCellActivated(selected);
-    //     }
-    //     pos.label = "";
-    //   }, 100);
-    //   return () => clearInterval(interval);
-    // }, [gridSelection]);
+    function normalizeNumber(text) {
+        const cleaned = text.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+        // strip common prefixes
+        const stripped = cleaned.replace(/(no|num|number|select|choose|#|\.)\s*/gi, "");
+        const map = {
+            "zero": "0", "0": "0",
+            "one": "1", "1": "1",
+            "two": "2", "to": "2", "too": "2", "2": "2",
+            "three": "3", "3": "3",
+            "four": "4", "for": "4", "4": "4",
+            "five": "5", "5": "5",
+            "six": "6", "6": "6",
+            "seven": "7", "7": "7",
+            "eight": "8", "ate": "8", "8": "8",
+            "nine": "9", "9": "9",
+            "ten": "10", "10": "10"
+        };
+        if (stripped in map)
+            return map[stripped];
+        return null;
+    }
     function selectCell(col, row) {
         const id = getCellId(col, row);
         // update ref (does NOT rerender)
@@ -336,5 +352,31 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
                 }, children: [_jsxs("h3", { children: ["Edit Cell ", activeCellRef.current.id] }), _jsx("textarea", { value: cellValue, onChange: (e) => {
                             setCellValue(e.target.value); // update state
                             console.log("Textarea changed:", e.target.value); // log new value
-                        }, style: { width: "100%", height: "80px", marginBottom: "1rem" }, placeholder: "Speak or type here..." }), _jsxs("div", { style: { textAlign: "right" }, children: [_jsx("button", { onClick: () => setIsEditing(false), children: "Cancel" }), _jsx("button", { onClick: manualHandleSave, children: "Save" })] })] }))] }));
+                        }, style: { width: "100%", height: "80px", marginBottom: "1rem" }, placeholder: "Speak or type here..." }), _jsx("div", { style: {
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: "6px",
+                            marginBottom: "1rem"
+                        }, children: transcripts.map((t, i) => (_jsxs("span", { style: {
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                padding: "1px",
+                                background: "#eef",
+                                borderRadius: "6px",
+                                fontSize: "10px",
+                                border: "1px solid #88f",
+                                cursor: "pointer",
+                                userSelect: "none"
+                            }, onClick: () => setCellValue(prev => prev + (prev ? ":" : "") + t), children: [_jsx("span", { style: {
+                                        background: "#88f",
+                                        color: "white",
+                                        borderRadius: "50%",
+                                        width: "16px",
+                                        height: "16px",
+                                        fontSize: "10px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center"
+                                    }, children: i + 1 }), t] }, i))) }), _jsxs("div", { style: { textAlign: "right" }, children: [_jsx("button", { onClick: () => setIsEditing(false), children: "Cancel" }), _jsx("button", { onClick: manualHandleSave, children: "Save" })] })] }))] }));
 }

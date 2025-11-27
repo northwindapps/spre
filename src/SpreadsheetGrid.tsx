@@ -22,6 +22,7 @@ export default function SpreadsheetGrid({
   const gridRef = React.useRef<DataEditorRef | null>(null);
   const latestTranscriptRef = React.useRef("");
   const [isEditing, setIsEditing] = React.useState(false);
+  const [transcripts, setTranscripts] = React.useState<string[]>([]);
 
   const [cellValue, setCellValue] = React.useState("");
   const [fillDirection, setFillDirection] = React.useState<"horizontal" | "vertical">("horizontal");
@@ -152,17 +153,38 @@ export default function SpreadsheetGrid({
   recognition.continuous = true;
   recognition.interimResults = true;
 
-  recognition.onresult = (event:SpeechRecognitionEvent) => {
+  recognition.onresult = (event: SpeechRecognitionEvent) => {
     let transcript = "";
     for (let i = event.resultIndex; i < event.results.length; i++) {
       transcript += event.results[i][0].transcript;
     }
-    setCellValue(transcript);
-    // testing
-    if (transcript !== '') {
-      latestTranscriptRef.current = transcript;
+
+    const trimmed = transcript.trim();
+    setCellValue(trimmed);
+
+    const normalized = normalizeNumber(transcript); // returns string like "1", "2", "3"
+    if (normalized !== null) {
+      const index = Number(normalized) - 1; // convert 1-based → 0-based
+      if (!isNaN(index) && transcripts[index] !== undefined) {
+        setCellValue(transcripts[index]); // set cell to that history item
+        latestTranscriptRef.current = transcripts[index];
+        return; // exit early
+      }
     }
+
+    // 📝 fallback normal behavior
+    if (trimmed !== "") {
+      latestTranscriptRef.current = trimmed;
+    }
+
+    if (event.results[event.resultIndex].isFinal && trimmed) {
+      setTranscripts(prev =>
+        prev.indexOf(trimmed) !== -1 ? prev : [...prev, trimmed]
+      );
+    }
+
   };
+
 
   recognition.onend = () => {
     if (active) recognition.start();  // only restart if modal still open
@@ -176,30 +198,31 @@ export default function SpreadsheetGrid({
   };
 }, [isEditing]);
 
+function normalizeNumber(text: string): string | null {
+  const cleaned = text.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
 
-  // cell selection
-//   React.useEffect(() => {
-//   const interval = setInterval(() => {
-//     const pos = fingerPosRef.current;
-//     if (!pos || pos.label !== "click") return;
+  // strip common prefixes
+  const stripped = cleaned.replace(/(no|num|number|select|choose|#|\.)\s*/gi, "");
 
-//     // fallback: use activeCellRef when grid is not focused
-//     const selected =
-//       gridSelection?.current?.cell ??
-//       (activeCellRef.current
-//         ? [activeCellRef.current.col, activeCellRef.current.row] as [number, number]
-//         : null);
+  const map: Record<string, string> = {
+    "zero": "0", "0": "0",
+    "one": "1", "1": "1",
+    "two": "2", "to": "2", "too": "2", "2": "2",
+    "three": "3", "3": "3",
+    "four": "4", "for": "4", "4": "4",
+    "five": "5", "5": "5",
+    "six": "6", "6": "6",
+    "seven": "7", "7": "7",
+    "eight": "8", "ate": "8", "8": "8",
+    "nine": "9", "9": "9",
+    "ten": "10", "10": "10"
+  };
 
-//     if (selected) {
-//       selectCell(selected[0], selected[1]);
-//       handleCellActivated(selected);
-//     }
+  if (stripped in map) return map[stripped];
+  return null;
+}
 
-//     pos.label = "";
-//   }, 100);
 
-//   return () => clearInterval(interval);
-// }, [gridSelection]);
 
 function selectCell(col: number, row: number) {
   const id = getCellId(col, row);
@@ -425,6 +448,7 @@ return (
           }}
         >
           <h3>Edit Cell {activeCellRef.current.id}</h3>
+          {/* make span lable for each transcription result */}
           <textarea
             value={cellValue}
              onChange={(e) => {
@@ -434,6 +458,54 @@ return (
             style={{ width: "100%", height: "80px", marginBottom: "1rem" }}
             placeholder="Speak or type here..."
           />
+
+          <div style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "6px",
+            marginBottom: "1rem"
+          }}>
+            {transcripts.map((t, i) => (
+              <span
+                key={i}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  padding: "1px",
+                  background: "#eef",
+                  borderRadius: "6px",
+                  fontSize: "10px",
+                  border: "1px solid #88f",
+                  cursor: "pointer",
+                  userSelect: "none"
+                }}
+                onClick={() => setCellValue(prev => prev + (prev ? ":" : "") + t)}
+              >
+                {/* Index badge */}
+                <span
+                  style={{
+                    background: "#88f",
+                    color: "white",
+                    borderRadius: "50%",
+                    width: "16px",
+                    height: "16px",
+                    fontSize: "10px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}
+                >
+                  {i + 1}
+                </span>
+
+                {/* Transcript text */}
+                {t}
+              </span>
+            ))}
+
+            </div>
+
           <div style={{ textAlign: "right" }}>
             <button onClick={() => setIsEditing(false)}>Cancel</button>
             <button onClick={manualHandleSave}>Save</button>
