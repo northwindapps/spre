@@ -9,6 +9,7 @@ import DataEditor, {
   type GridSelection,
 } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
+import ReactCountryFlag from "react-country-flag";
 
 export default function SpreadsheetGrid({
   fingerPosRef,
@@ -22,7 +23,7 @@ export default function SpreadsheetGrid({
   const gridRef = React.useRef<DataEditorRef | null>(null);
   const latestTranscriptRef = React.useRef("");
   const [isEditing, setIsEditing] = React.useState(false);
-  const [transcripts, setTranscripts] = React.useState<string[]>([]);
+  const transcripts = React.useRef<string[]>([]);
 
   const [cellValue, setCellValue] = React.useState("");
   const [fillDirection, setFillDirection] = React.useState<"horizontal" | "vertical">("horizontal");
@@ -105,14 +106,18 @@ export default function SpreadsheetGrid({
         const targetRow = row + i;
         if (targetRow < totalRows) newValues[getCellId(col, targetRow)] = part;
       }
+      });
+      return newValues;
     });
-    return newValues;
-  });
 
-  setIsEditing(false);
-};
+    setIsEditing(false);
+  };
 
-
+  const setSpeechLang = (lang: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", lang); // add or replace ?lang=
+    window.history.replaceState({}, "", url.toString());
+  };
 
   const handleExportCSV = () => {
     const rows: string[][] = [];
@@ -141,6 +146,9 @@ export default function SpreadsheetGrid({
   // 🎤 --- SPEECH RECOGNITION SETUP ---
   React.useEffect(() => {
   if (!isEditing) return;
+  //?lang=fr-FR
+  const params = new URLSearchParams(window.location.search);
+  const lang = params.get("lang") || "en-US"; // default
 
   const SpeechRecognition =
     (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -149,7 +157,7 @@ export default function SpreadsheetGrid({
   const recognition = new SpeechRecognition();
   let active = true; // <— add this
 
-  recognition.lang = "en-US";
+  recognition.lang = lang;
   recognition.continuous = true;
   recognition.interimResults = true;
 
@@ -165,9 +173,9 @@ export default function SpreadsheetGrid({
     const normalized = normalizeNumber(transcript); // returns string like "1", "2", "3"
     if (normalized !== null) {
       const index = Number(normalized) - 1; // convert 1-based → 0-based
-      if (!isNaN(index) && transcripts[index] !== undefined) {
-        setCellValue(transcripts[index]); // set cell to that history item
-        latestTranscriptRef.current = transcripts[index];
+      if (!isNaN(index) && transcripts.current[index] !== undefined) {
+        setCellValue(transcripts.current[index]); // set cell to that history item
+        latestTranscriptRef.current = transcripts.current[index];
         return; // exit early
       }
     }
@@ -178,11 +186,10 @@ export default function SpreadsheetGrid({
     }
 
     if (event.results[event.resultIndex].isFinal && trimmed) {
-      setTranscripts(prev =>
-        prev.indexOf(trimmed) !== -1 ? prev : [...prev, trimmed]
-      );
+      if (transcripts.current.indexOf(trimmed) === -1) {
+        transcripts.current.push(trimmed);
+      }
     }
-
   };
 
 
@@ -200,9 +207,8 @@ export default function SpreadsheetGrid({
 
 function normalizeNumber(text: string): string | null {
   const cleaned = text.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
-
   // strip common prefixes
-  const stripped = cleaned.replace(/(no|num|number|select|choose|#|\.)\s*/gi, "");
+  const stripped = cleaned.replace(/(no|num|select|choose|delete|#|\.)\s*/gi, "");
 
   const map: Record<string, string> = {
     "zero": "0", "0": "0",
@@ -405,6 +411,26 @@ return (
           🔄 Direction: {fillDirection === "horizontal" ? "Horizontal →" : "Vertical ↓"}
         </button>
         <button onClick={handleExportCSV}>⬇️ Export CSV</button>
+        {/*  */}
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',       // allows flags to move to next line on small screens
+          gap: '8px',             // spacing between flags
+          alignItems: 'center'
+        }}>
+          <span onClick={() => setSpeechLang("en-US")}><ReactCountryFlag countryCode="US" svg style={{ width: '2em', height: '2em' }} /></span>
+          <span onClick={() => setSpeechLang("es-ES")}><ReactCountryFlag countryCode="ES" svg style={{ width: '2em', height: '2em' }} /></span>
+          <span onClick={() => setSpeechLang("fr-FR")}><ReactCountryFlag countryCode="FR" svg style={{ width: '2em', height: '2em' }} /></span>
+          <span onClick={() => setSpeechLang("de-DE")}><ReactCountryFlag countryCode="DE" svg style={{ width: '2em', height: '2em' }} /></span>
+          <span onClick={() => setSpeechLang("ja-JP")}><ReactCountryFlag countryCode="JP" svg style={{ width: '2em', height: '2em' }} /></span>
+          <span onClick={() => setSpeechLang("zh-CN")}><ReactCountryFlag countryCode="CN" svg style={{ width: '2em', height: '2em' }} /></span>
+          <span onClick={() => setSpeechLang("it-IT")}><ReactCountryFlag countryCode="IT" svg style={{ width: '2em', height: '2em' }} /></span>
+          <span onClick={() => setSpeechLang("da-DK")}><ReactCountryFlag countryCode="DK" svg style={{ width: '2em', height: '2em' }} /></span>
+          <span onClick={() => setSpeechLang("ru-RU")}><ReactCountryFlag countryCode="RU" svg style={{ width: '2em', height: '2em' }} /></span>
+          <span onClick={() => setSpeechLang("el-GR")}><ReactCountryFlag countryCode="GR" svg style={{ width: '2em', height: '2em' }} /></span>
+          <span onClick={() => setSpeechLang("pt-PT")}><ReactCountryFlag countryCode="PT" svg style={{ width: '2em', height: '2em' }} /></span>
+          <span onClick={() => setSpeechLang("ko-KR")}><ReactCountryFlag countryCode="KR" svg style={{ width: '2em', height: '2em' }} /></span>
+        </div>
       </div>
 
       <DataEditor
@@ -465,7 +491,7 @@ return (
             gap: "6px",
             marginBottom: "1rem"
           }}>
-            {transcripts.map((t, i) => (
+            {transcripts.current.map((t, i) => (
               <span
                 key={i}
                 style={{

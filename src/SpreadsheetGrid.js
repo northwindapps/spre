@@ -2,6 +2,7 @@ import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
 import React from "react";
 import DataEditor, { GridCellKind, CompactSelection, } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
+import ReactCountryFlag from "react-country-flag";
 export default function SpreadsheetGrid({ fingerPosRef, }) {
     const [values, setValues] = React.useState({});
     const activeCellRef = React.useRef(null);
@@ -10,7 +11,7 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
     const gridRef = React.useRef(null);
     const latestTranscriptRef = React.useRef("");
     const [isEditing, setIsEditing] = React.useState(false);
-    const [transcripts, setTranscripts] = React.useState([]);
+    const transcripts = React.useRef([]);
     const [cellValue, setCellValue] = React.useState("");
     const [fillDirection, setFillDirection] = React.useState("horizontal");
     const [gridSelection, setGridSelection] = React.useState();
@@ -85,6 +86,11 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
         });
         setIsEditing(false);
     };
+    const setSpeechLang = (lang) => {
+        const url = new URL(window.location.href);
+        url.searchParams.set("lang", lang); // add or replace ?lang=
+        window.history.replaceState({}, "", url.toString());
+    };
     const handleExportCSV = () => {
         var _a;
         const rows = [];
@@ -109,12 +115,15 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
     React.useEffect(() => {
         if (!isEditing)
             return;
+        //?lang=fr-FR
+        const params = new URLSearchParams(window.location.search);
+        const lang = params.get("lang") || "en-US"; // default
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition)
             return;
         const recognition = new SpeechRecognition();
         let active = true; // <— add this
-        recognition.lang = "en-US";
+        recognition.lang = lang;
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.onresult = (event) => {
@@ -127,9 +136,9 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
             const normalized = normalizeNumber(transcript); // returns string like "1", "2", "3"
             if (normalized !== null) {
                 const index = Number(normalized) - 1; // convert 1-based → 0-based
-                if (!isNaN(index) && transcripts[index] !== undefined) {
-                    setCellValue(transcripts[index]); // set cell to that history item
-                    latestTranscriptRef.current = transcripts[index];
+                if (!isNaN(index) && transcripts.current[index] !== undefined) {
+                    setCellValue(transcripts.current[index]); // set cell to that history item
+                    latestTranscriptRef.current = transcripts.current[index];
                     return; // exit early
                 }
             }
@@ -138,7 +147,9 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
                 latestTranscriptRef.current = trimmed;
             }
             if (event.results[event.resultIndex].isFinal && trimmed) {
-                setTranscripts(prev => prev.indexOf(trimmed) !== -1 ? prev : [...prev, trimmed]);
+                if (transcripts.current.indexOf(trimmed) === -1) {
+                    transcripts.current.push(trimmed);
+                }
             }
         };
         recognition.onend = () => {
@@ -154,7 +165,7 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
     function normalizeNumber(text) {
         const cleaned = text.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
         // strip common prefixes
-        const stripped = cleaned.replace(/(no|num|number|select|choose|#|\.)\s*/gi, "");
+        const stripped = cleaned.replace(/(no|num|select|choose|delete|#|\.)\s*/gi, "");
         const map = {
             "zero": "0", "0": "0",
             "one": "1", "1": "1",
@@ -329,7 +340,12 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
             newValues[getCellId(col, targetRow)] = part;
         }
     } }); return newValues; }); setIsEditing(false); };
-    return (_jsxs("div", { style: { height: "80vh", width: "100%", position: "relative" }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }, children: [_jsxs("button", { onClick: () => setFillDirection((prev) => (prev === "horizontal" ? "vertical" : "horizontal")), children: ["\uD83D\uDD04 Direction: ", fillDirection === "horizontal" ? "Horizontal →" : "Vertical ↓"] }), _jsx("button", { onClick: handleExportCSV, children: "\u2B07\uFE0F Export CSV" })] }), _jsx(DataEditor, { ref: gridRef, columns: columns, rows: totalRows, getCellContent: getCellContent, freezeColumns: 1, freezeTrailingRows: 1, rowHeight: 28, headerHeight: 32, onCellActivated: handleCellActivated, onCellClicked: (cell) => {
+    return (_jsxs("div", { style: { height: "80vh", width: "100%", position: "relative" }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "flex-start", gap: "5px", marginBottom: "8px" }, children: [_jsxs("button", { onClick: () => setFillDirection((prev) => (prev === "horizontal" ? "vertical" : "horizontal")), children: ["\uD83D\uDD04 Direction: ", fillDirection === "horizontal" ? "Horizontal →" : "Vertical ↓"] }), _jsx("button", { onClick: handleExportCSV, children: "\u2B07\uFE0F Export CSV" }), _jsxs("div", { style: {
+                            display: 'flex',
+                            flexWrap: 'wrap', // allows flags to move to next line on small screens
+                            gap: '8px', // spacing between flags
+                            alignItems: 'center'
+                        }, children: [_jsx("span", { onClick: () => setSpeechLang("en-US"), children: _jsx(ReactCountryFlag, { countryCode: "US", svg: true, style: { width: '2em', height: '2em' } }) }), _jsx("span", { onClick: () => setSpeechLang("es-ES"), children: _jsx(ReactCountryFlag, { countryCode: "ES", svg: true, style: { width: '2em', height: '2em' } }) }), _jsx("span", { onClick: () => setSpeechLang("fr-FR"), children: _jsx(ReactCountryFlag, { countryCode: "FR", svg: true, style: { width: '2em', height: '2em' } }) }), _jsx("span", { onClick: () => setSpeechLang("de-DE"), children: _jsx(ReactCountryFlag, { countryCode: "DE", svg: true, style: { width: '2em', height: '2em' } }) }), _jsx("span", { onClick: () => setSpeechLang("ja-JP"), children: _jsx(ReactCountryFlag, { countryCode: "JP", svg: true, style: { width: '2em', height: '2em' } }) }), _jsx("span", { onClick: () => setSpeechLang("zh-CN"), children: _jsx(ReactCountryFlag, { countryCode: "CN", svg: true, style: { width: '2em', height: '2em' } }) }), _jsx("span", { onClick: () => setSpeechLang("it-IT"), children: _jsx(ReactCountryFlag, { countryCode: "IT", svg: true, style: { width: '2em', height: '2em' } }) }), _jsx("span", { onClick: () => setSpeechLang("da-DK"), children: _jsx(ReactCountryFlag, { countryCode: "DK", svg: true, style: { width: '2em', height: '2em' } }) }), _jsx("span", { onClick: () => setSpeechLang("ru-RU"), children: _jsx(ReactCountryFlag, { countryCode: "RU", svg: true, style: { width: '2em', height: '2em' } }) }), _jsx("span", { onClick: () => setSpeechLang("el-GR"), children: _jsx(ReactCountryFlag, { countryCode: "GR", svg: true, style: { width: '2em', height: '2em' } }) }), _jsx("span", { onClick: () => setSpeechLang("pt-PT"), children: _jsx(ReactCountryFlag, { countryCode: "PT", svg: true, style: { width: '2em', height: '2em' } }) }), _jsx("span", { onClick: () => setSpeechLang("ko-KR"), children: _jsx(ReactCountryFlag, { countryCode: "KR", svg: true, style: { width: '2em', height: '2em' } }) })] })] }), _jsx(DataEditor, { ref: gridRef, columns: columns, rows: totalRows, getCellContent: getCellContent, freezeColumns: 1, freezeTrailingRows: 1, rowHeight: 28, headerHeight: 32, onCellActivated: handleCellActivated, onCellClicked: (cell) => {
                     var _a;
                     const [col, row] = cell;
                     const cellId = getCellId(col, row);
@@ -357,7 +373,7 @@ export default function SpreadsheetGrid({ fingerPosRef, }) {
                             flexWrap: "wrap",
                             gap: "6px",
                             marginBottom: "1rem"
-                        }, children: transcripts.map((t, i) => (_jsxs("span", { style: {
+                        }, children: transcripts.current.map((t, i) => (_jsxs("span", { style: {
                                 display: "inline-flex",
                                 alignItems: "center",
                                 gap: "4px",
